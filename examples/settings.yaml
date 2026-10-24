@@ -1,110 +1,68 @@
-# dsh-multi-model-orchestrator — example settings
-# =================================================
+# LEGACY 0.1.x settings.yaml — MIGRATION REFERENCE ONLY
+# =====================================================
 #
-# Paste the sections below into your $DSH_HOME/settings.yaml (the file is
-# usually at ~/.dsh/settings.yaml) and restart the harness. Everything here is
-# ordinary harness configuration — no plugin patch is involved.
+# Do NOT use this file for a new DeepSeek Harness 0.2.x install.
+# The current format is the profile patch: see examples/cordis.patch.yml.
 #
-# ⚠️ The provider names below (glm / kimi / qwen) are ILLUSTRATIVE presets.
-# Your profile registers its own providers — e.g. deepseek-official and a
-# Zhipu "zai" gateway — so `subagent-model-selection.allowedModels` and
-# `multi-model-orchestrator.modelNotes` must use YOUR actual provider/model
-# ids, or the main brain can never match them. Call `list_subagent_models`
-# (or check the web "Models" page) for the live list.
+# What 0.2.x does with a leftover settings.yaml:
+#   * At startup it imports each section ONCE into the profile entry with the
+#     same id, then renames the file to settings.yaml.imported.
+#   * Edits made after that import are ignored.
+#   * A section whose id is not a live profile entry is logged and left only
+#     in the renamed file; it no longer configures anything.
 #
-# Three things are configured:
-#   1. `llm-pi-ai.providers`   — OpenAI-compatible third-party routes
-#                                (GLM / Kimi / Qwen). Fill the API keys and the
-#                                routes come alive.
-#   2. `subagent-model-selection` — allow sub-agents to be dispatched onto the
-#                                routes above via provider/model.
-#   3. `multi-model-orchestrator.modelNotes` — per-route strengths/weaknesses
-#                                the main brain uses to pick a model.
+# Section-by-section:
+#   llm-pi-ai:                    imported once into the `llm-pi-ai` row.
+#   project-lead:     imported once into the plugin row, if mounted.
+#   subagent-model-selection:     NOT a valid 0.2.x entry id; dropped.
+#                                 Migrate it to
+#                                 `subagent-model-selection-settings` in the
+#                                 profile patch (or the Web Plugins page).
 #
-# API keys: set the env vars named by `apiKeyEnv`, or add them under
-# `$DSH_HOME/.credentials.yaml`, or paste them on the web "Models" page.
+# 0.1.x also had a foreground/background delegation switch. It no longer
+# exists: `subagent` is always asynchronous and reports through completion
+# notices.
 #
-# Tip: some reasoning routes (Zhipu GLM-5.3 line) reject calls without an
-# explicit reasoning tier — dispatch those with a reasoning_effort such as low.
-
-# ── 1) Third-party OpenAI-compatible model routes ────────────────────────────
-llm-pi-ai:
-  providers:
-    glm:
-      displayName: Zhipu GLM
-      apiKeyEnv: GLM_API_KEY
-      api: openai-completions
-      baseURL: https://open.bigmodel.cn/api/paas/v4
-      models:
-        - id: glm-4.6
-          name: GLM-4.6
-          contextWindow: 200000
-        - id: glm-4.5-air
-          name: GLM-4.5-Air
-          contextWindow: 128000
-        - id: glm-4-flash
-          name: GLM-4-Flash
-          contextWindow: 128000
-    kimi:
-      displayName: Moonshot Kimi
-      apiKeyEnv: KIMI_API_KEY
-      api: openai-completions
-      baseURL: https://api.moonshot.cn/v1
-      models:
-        - id: kimi-k2-0711-preview
-          name: Kimi K2
-          contextWindow: 128000
-        - id: kimi-latest
-          name: Kimi Latest
-          contextWindow: 128000
-    qwen:
-      displayName: Alibaba Qwen
-      apiKeyEnv: DASHSCOPE_API_KEY
-      api: openai-completions
-      baseURL: https://dashscope.aliyuncs.com/compatible-mode/v1
-      models:
-        - id: qwen-max
-          name: Qwen-Max
-          contextWindow: 128000
-        - id: qwen-turbo
-          name: Qwen-Turbo
-          contextWindow: 131072
-
-# ── 2) Sub-agent model selection ─────────────────────────────────────────────
-# Lets the main brain choose the model for each dispatched sub-agent and call
-# list_subagent_models. The allow-list must be enabled and non-empty; adjust it
-# to the routes you actually configured above (and keep your default route).
-subagent-model-selection:
-  enabled: true
-  allowedModels:
-    - { provider: glm, model: glm-4.6 }
-    - { provider: glm, model: glm-4-flash }
-    - { provider: kimi, model: kimi-k2-0711-preview }
-    - { provider: qwen, model: qwen-max }
-    - { provider: qwen, model: qwen-turbo }
-
-# ── 3) Multi-model orchestrator plugin config ────────────────────────────────
-# Per-route notes the main brain reads when assigning subtasks. Keys are
-# `<provider>/<model>`; adjust to the models you actually use.
-multi-model-orchestrator:
-  modelNotes:
-    glm/glm-4.6:
-      description: Zhipu flagship, strong reasoning.
-      strengths: complex reasoning, coding, agentic tool use, long context
-      weaknesses: slower and pricier
-    glm/glm-4-flash:
-      description: Zhipu fast free model.
-      strengths: free, fast, good for simple high-volume work
-      weaknesses: weak reasoning, not for complex tasks
-    kimi/kimi-k2-0711-preview:
-      description: Kimi K2, strong reasoning and long context.
-      strengths: long context, complex reasoning, agentic
-      weaknesses: slower and pricier
-    qwen/qwen-max:
-      description: Alibaba flagship.
-      strengths: strong reasoning, multilingual, agentic
-      weaknesses: slower and pricier
-    qwen/qwen-turbo:
-      description: Alibaba fast tier.
-      strengths: fast, cheap, good for high-volume simple work
-      weaknesses: weaker on complex reasoning
+# The original 0.1.x shape is kept below as comments so it is inert even if
+# this file is accidentally copied into $DSH_HOME.
+#
+# ── 1) Third-party routes (old shape) ────────────────────────────────────────
+# llm-pi-ai:
+#   providers:
+#     glm:
+#       displayName: Zhipu GLM
+#       apiKeyEnv: GLM_API_KEY
+#       api: openai-completions
+#       baseURL: https://open.bigmodel.cn/api/paas/v4
+#       models:
+#         - id: glm-4.6
+#           name: GLM-4.6
+#           contextWindow: 200000
+#     kimi:
+#       displayName: Moonshot Kimi
+#       apiKeyEnv: KIMI_API_KEY
+#       api: openai-completions
+#       baseURL: https://api.moonshot.cn/v1
+#       models:
+#         - id: kimi-k2-0711-preview
+#           name: Kimi K2
+#           contextWindow: 128000
+#
+# ── 2) Subagent allow-list (old shape; section id no longer valid) ───────────
+# subagent-model-selection:
+#   enabled: true
+#   allowedModels:
+#     - { provider: glm, model: glm-4.6 }
+#     - { provider: kimi, model: kimi-k2-0711-preview }
+#
+# ── 3) Model notes (old shape; now the plugin row's config) ──────────────────
+# project-lead:
+#   modelNotes:
+#     glm/glm-4.6:
+#       description: Zhipu flagship, strong reasoning.
+#       strengths: complex reasoning, coding, agentic tool use, long context
+#       weaknesses: slower and pricier
+#     kimi/kimi-k2-0711-preview:
+#       description: Kimi K2, strong reasoning and long context.
+#       strengths: long context, complex reasoning, agentic
+#       weaknesses: slower and pricier

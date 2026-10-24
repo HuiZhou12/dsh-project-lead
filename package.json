@@ -1,22 +1,27 @@
 {
-  "name": "dsh-multi-model-orchestrator",
-  "version": "0.2.2",
-  "description": "A DeepSeek Harness (dsh) plugin: orchestrates complex tasks across multiple models — a 'main brain' decomposes the task and dispatches subtasks to GLM / Kimi / Qwen etc. sub-agents by each model's strengths, with per-model token usage.",
+  "name": "dsh-project-lead",
+  "version": "0.5.0",
+  "description": "A DeepSeek Harness 0.2.x plugin: a Project Lead / Project Manager main agent that delegates implementation to subagents, injects bundled PM/executor/reviewer/scout role prompts, reports per-model token usage, and ships a first-party Settings-page UI for prompt scope and subagent routing.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
+    "./client": "./lib/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
     "lib",
+    "prompts",
     "cordis.patch.yml",
     "examples",
     "README.md",
     "README.zh.md",
     "LICENSE"
   ],
+  "scripts": {
+    "test": "node --check lib/client.js && node test/plugin.test.js && node test/prompts.test.js && node test/compatibility.test.js"
+  },
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
@@ -24,6 +29,8 @@
     "multi-model",
     "multi-agent",
     "orchestrator",
+    "project-lead",
+    "project-manager",
     "glm",
     "kimi",
     "qwen",
@@ -34,10 +41,10 @@
     "@deepseek-ai/schemastery": "^3.18.2"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-llm": ">=0.1.2-rc.1 <0.2.0-0",
-    "@deepseek-ai/dsh-system-prompt": ">=0.1.2-rc.1 <0.2.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.1.2-rc.1 <0.2.0-0"
+    "@deepseek-ai/cordis": "^4.0.5",
+    "@deepseek-ai/dsh-llm": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-system-prompt": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/cordis": {
@@ -53,9 +60,23 @@
       "optional": true
     }
   },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.5",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.2"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web"
     }
   },
   "publishConfig": {
@@ -64,7 +85,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Bazley13/dsh-multi-model-orchestrator.git"
+    "url": "git+https://github.com/HuiZhou12/dsh-project-lead.git"
   },
   "license": "MIT"
 }

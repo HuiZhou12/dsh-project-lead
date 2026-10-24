@@ -1,111 +1,162 @@
-# dsh-multi-model-orchestrator
+# dsh-project-lead
 
-A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) plugin that turns your primary AI into a **multi-model "main brain"**. When a task is complex, it decomposes the task into subtasks and dispatches each to the sub-agent model best suited for it (GLM / Kimi / Qwen / any OpenAI-compatible route you configure), while tracking **per-model token usage**.
+[![MIT Licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
 
-## Features
+`dsh-project-lead` is a DeepSeek Harness 0.2.x plugin for running a top-level
+Project Manager that plans work, dispatches self-contained child tasks, reviews
+evidence, and reports results. Delegated children receive separate executor,
+reviewer, or scout prompts, while the plugin records process-wide token usage by
+`provider/model`.
 
-1. **Multi-model orchestration guidance** — a system-prompt section coaches the main brain to decompose complex tasks, inspect available routes with `list_subagent_models`, and dispatch each subtask via `subagent` with an explicit `provider` / `model`.
-2. **Model-aware dispatch** — you describe each route's strengths/weaknesses once (see config); the main brain assigns work accordingly (strong models for hard reasoning, fast/cheap ones for high-volume work).
-3. **Per-model token usage** — a `model_token_usage` tool reports input / output / cache read / cache write tokens and request counts per `provider/model`, accumulated since the process started.
+## Requirements
 
-The plugin does **not** touch any harness internals. All model routes and the sub-agent allow-list are ordinary harness settings — see [examples/settings.yaml](examples/settings.yaml).
+- DeepSeek Harness `>=0.2.1-rc.2 <0.3.0-0`.
+- A profile that mounts `dsh-system-prompt`, `dsh-tools`, `dsh-llm`, and a
+  `subagent` delegation tool.
+- For child model selection, the `subagent-model-selection-settings` allow-list
+  and a preset-scoped delegation tool with `modelSelectionSettings: true`.
+  Shipped Web presets provide the required scope.
 
-## Install
+## Installation
 
-Install into a dsh profile (usually `web`):
+Install the plugin in a Web profile:
 
 ```sh
-dsh plugin --profile web add dsh-multi-model-orchestrator
+dsh plugin --profile web add dsh-project-lead
 ```
 
-or, from a git checkout:
+For a local checkout:
 
 ```sh
-dsh plugin --profile web add github:YOU/dsh-multi-model-orchestrator
+dsh plugin --profile web add link:/absolute/path/to/dsh-project-lead
 ```
 
-Restart the harness (or reload the profile) afterwards. The plugin loads itself as a profile layer via its `cordis.patch.yml`.
+The package's [bundle patch](cordis.patch.yml) mounts the `project-lead` row.
+Restart the harness after profile changes when HMR is not enabled.
+
+## Configuration
+
+Use **Settings → 项目编排** for the plugin settings, or merge the equivalent
+entries from [examples/cordis.patch.yml](examples/cordis.patch.yml) into
+`$DSH_HOME/profiles/<profile>/cordis.patch.yml`. A profile patch replaces a
+target row's whole `config:` value, so preserve any existing values when
+merging.
+
+The optional PM preset in
+[examples/pm-preset.patch.yml](examples/pm-preset.patch.yml) gives the PM
+session `read` and `read_image`, removes `write` and `edit`, and does not expose
+shell tools. Its children use the Standard preset.
+
+The plugin row accepts these settings:
+
+```yaml
+- id: project-lead
+  config:
+    prompts:
+      main: compact          # compact | full | guidance | off
+      pmPreset: pm           # preset that receives the PM prompt; empty = all
+      otherMain: guidance    # guidance | off for other top-level sessions
+      childRoles: true
+      defaultChildRole: executor
+      roleMarker: ROLE
+    subagent:
+      provider: glm
+      model: glm-4-flash
+      reasoningEffort: ""
+    modelNotes:
+      glm/glm-4.6:
+        description: Strong reasoning route.
+        strengths: complex reasoning, coding
+        weaknesses: slower and pricier
+```
+
+`modelNotes` is a routing guide; it does not authorize models. Authorize exact
+`provider`/`model` pairs in `subagent-model-selection-settings`. The complete
+route, allow-list, and preset examples are in
+[examples/cordis.patch.yml](examples/cordis.patch.yml).
 
 ## Quick start
 
-1. **Add your third-party model routes** to `$DSH_HOME/settings.yaml` (default `~/.dsh/settings.yaml`). GLM / Kimi / Qwen presets ready to paste: see [examples/settings.yaml](examples/settings.yaml). Each route needs only an API key behind `apiKeyEnv` (env var, `$DSH_HOME/.credentials.yaml`, or the web **Models** page).
+1. Install the plugin and apply the optional PM preset if the top-level session
+   must not edit files or run commands.
+2. Configure at least one model route and authorize it for child agents. The
+   route's `apiKeyEnv` names the environment variable or credential-store key
+   that supplies its API key; do not put the key itself in the profile patch.
+3. Start a session with the configured PM preset and give it a project task. A
+   PM brief should identify the goal, constraints, verification evidence, and
+   which independent parts may be delegated.
 
-2. **Enable sub-agent model selection** so the main brain can pick the model for each child:
-   ```yaml
-   subagent-model-selection:
-     enabled: true
-     allowedModels:
-       - { provider: glm, model: glm-4.6 }
-       # ... your other routes
-   ```
+For a child role, begin the delegation brief with one of these markers:
 
-3. **(Optional) Add model notes** the main brain reads when assigning work:
-   ```yaml
-   multi-model-orchestrator:
-     modelNotes:
-       glm/glm-4.6:
-         description: Zhipu flagship, strong reasoning.
-         strengths: complex reasoning, coding, agentic tool use
-         weaknesses: slower and pricier
-   ```
+```text
+ROLE: executor
+ROLE: reviewer
+ROLE: scout
+```
 
-4. Restart the harness and ask, e.g.:
-   > Break this into parallel subtasks and dispatch each to the best model.
+The plugin reads the marker from the child request. When it is absent,
+`defaultChildRole` applies. A `subagent` call returns `started subagent <childId>`
+while the child runs; the completion notice contains its result or failure
+details.
 
-### Credentials
+Ask the main agent to call `model_token_usage` to report input, output, cache,
+reasoning, and request counts for every usage-bearing model stream since the
+plugin process started.
 
-Keys are resolved per request through each route's `apiKeyEnv`. Provide them any of these ways:
+## What it does
 
-- **Environment variables**: `GLM_API_KEY` / `KIMI_API_KEY` / `DASHSCOPE_API_KEY` (per your route names).
-- **Credential store** `$DSH_HOME/.credentials.yaml`:
-  ```yaml
-  GLM_API_KEY: sk-xxxx
-  KIMI_API_KEY: sk-xxxx
-  DASHSCOPE_API_KEY: sk-xxxx
-  ```
-- **Web "Models" page**: paste the key directly (stored in the managed credential document).
+- Injects a PM prompt only for the configured `pmPreset`; other top-level
+  sessions keep their normal tools and receive `otherMain` guidance when enabled.
+- Injects separate bundled executor, reviewer, and scout contracts into child
+  sessions.
+- Supports `compact`, `full`, `guidance`, and `off` prompt modes plus an optional
+  custom prompt directory using the bundled `00-08` filenames.
+- Tracks usage across sessions and sub-agents, grouped and sorted by
+  `provider/model`. The store resets when the plugin process restarts.
+- Adds a Web Settings page for prompt scope, child routing, model notes, and
+  locale-aware form editing.
 
-Routes without a key fail at request time with `MISSING_CREDENTIAL` and do not affect configured ones.
+## Documentation
 
-## How the main brain works
+- [Profile patch example](examples/cordis.patch.yml)
+- [PM preset example](examples/pm-preset.patch.yml)
+- [Legacy 0.1.x settings format](examples/settings.yaml)
+- [中文 README](README.zh.md)
 
-Ask for a complex task in the main conversation. The main brain will:
+### Migrating from 0.1.x
 
-1. use `todo_write` to record the decomposed subtasks;
-2. call `list_subagent_models` to see available routes;
-3. dispatch each subtask through `subagent` (with `provider` / `model`) to the best-fit model — launching independent delegations in one message, running them in the background by default;
-4. gather results and synthesize the final deliverable.
-
-> **Route names are whatever your profile actually registers** — the GLM / Kimi / Qwen names in the examples are illustrative. If you registered routes under other providers (e.g. a `zai` gateway), reference those exact `provider`/`model` ids in `subagent-model-selection` and `modelNotes`. Ask `list_subagent_models` for the live list.
-
-To see usage, ask the main brain to call `model_token_usage` (or just ask "how many tokens has each model used?").
-
-## Configuration reference
-
-Everything is configured in `$DSH_HOME/settings.yaml`:
-
-| Section | Purpose |
-|---|---|
-| `llm-pi-ai.providers` | OpenAI-compatible third-party model routes (any vendor). |
-| `subagent-model-selection` | Allow-list of `{provider, model}` the sub-agent tool may dispatch to. |
-| `multi-model-orchestrator.modelNotes` | Per-route strengths/weaknesses that guide assignment. |
-
-To add your own vendor, extend `llm-pi-ai.providers` with `{ api, baseURL, apiKeyEnv, models }` (any OpenAI-compatible `api: openai-completions` gateway works), then add matching entries to `subagent-model-selection.allowedModels` and `multi-model-orchestrator.modelNotes`.
-
-## Notes & limitations
-
-- Token usage is **per-process** (cleared when the harness restarts); per-session usage still shows in the built-in token meter.
-- `model_token_usage` needs at least one model call that returned a `usage` chunk before it reports anything.
-- The orchestration guidance is injected globally, so sub-agents read it too; its wording keeps sub-agents from recursively re-decomposing their single focused subtask.
-- Third-party routes are registered as **non-reasoning** models by default; reasoning flags (`reasoningEfforts` / `compat.thinkingFormat`) can be added per model on the web **Models** page.
-- **Some reasoning models reject a call without an explicit reasoning tier.** Zhipu's GLM-5.3 line, for example, fails with default parameters and only responds when the sub-agent is dispatched with an explicit `reasoning_effort` (e.g. `low`). If a dispatched child errors on a model you expect to work, add an explicit `reasoning_effort` to the dispatch. A route that returns no tokens despite requests succeeding at the API level is usually a provider-side issue, not an orchestrator bug.
+DeepSeek Harness 0.2.x imports `$DSH_HOME/settings.yaml` once and then renames
+it to `settings.yaml.imported`; later edits are ignored. Move configuration to
+the profile patch or the Settings page. Use the current row ids
+`llm-pi-ai`, `subagent-model-selection-settings`, `tool-subagent`, and
+`project-lead`. The old `subagent-model-selection` id and the former
+foreground/background delegation switch are not part of the 0.2.x interface.
 
 ## Troubleshooting
 
-- **`ERR_MODULE_NOT_FOUND: Cannot find package '@deepseek-ai/...'`** — the plugin was linked manually (raw `link:` + a hand-made `node_modules` junction) instead of installed through `dsh plugin ... add`. Install it as a real dependency of the profile and remove the junction.
-- **`model_token_usage` returns "No records yet"** — no model call has completed with usage since load; make a request and ask again.
-- **Children cannot be dispatched to a route / `list_subagent_models` is empty** — check that `subagent-model-selection` is `enabled: true` with a non-empty `allowedModels`, and that the routes exist under `llm-pi-ai.providers`.
+- **`list_subagent_models` is missing:** enable
+  `subagent-model-selection-settings`, provide a non-empty allow-list, and use a
+  preset-scoped delegation row with `modelSelectionSettings: true`.
+- **`standing modelSelectionSettings requires a scoped preset Context`:** move
+  the setting inside an agent-preset scope, or omit it and use the configured
+  child route.
+- **A child route is rejected:** check that the exact provider/model pair is in
+  `allowedModels` and that the delegation depth limit has not been reached.
+- **`started subagent ...` has no answer yet:** wait for the completion notice;
+  the start acknowledgement is not task success.
+- **`model_token_usage` reports no records:** no usage-bearing model stream has
+  completed since the plugin loaded.
+
+## Testing
+
+```sh
+npm test
+```
+
+The test script checks JavaScript syntax, plugin configuration and prompt
+selection, role-marker parsing, usage accounting, package compatibility, and
+the shipped examples.
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

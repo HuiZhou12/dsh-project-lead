@@ -1,111 +1,147 @@
-# dsh-multi-model-orchestrator
+# dsh-project-lead
 
-一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)(dsh)插件:让主 AI 成为**多模型协作的「主脑」**。任务复杂时,它会把任务拆解成多个子任务,并分派给你所配置的最合适模型(GLM / Kimi / Qwen / 任意 OpenAI 兼容路由)上的子代理,同时按 `provider/model` 统计 **token 用量**。
+[![MIT Licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
 
-## 功能
+`dsh-project-lead` 是一个 DeepSeek Harness 0.2.x 插件，用于运行顶层
+Project Manager：规划工作、派发自包含的子任务、审查证据并汇报结果。被派发的
+子 Agent 会分别获得 executor、reviewer 或 scout 提示词；插件还会按
+`provider/model` 记录进程级 token 用量。
 
-1. **多模型编排指引** —— 注入一段系统提示,引导主脑拆解复杂任务、用 `list_subagent_models` 查看可用路由,并通过 `subagent` 工具带 `provider` / `model` 参数把每个子任务分派出去。
-2. **按模型优缺点分派** —— 你只需在配置里写明各路由的优缺点(见配置),主脑便会据此分派(复杂推理给强模型、简单量大给快模型)。
-3. **按模型查看 token 用量** —— `model_token_usage` 工具按 `provider/model` 报告输入/输出/缓存读写 token 与请求次数,进程内累计。
+## 环境要求
 
-插件**不改动任何 harness 内部**。所有模型路由与子代理允许列表都是普通的 harness 配置——见 [examples/settings.yaml](examples/settings.yaml)。
+- DeepSeek Harness `>=0.2.1-rc.2 <0.3.0-0`。
+- profile 中挂载 `dsh-system-prompt`、`dsh-tools`、`dsh-llm` 和一个
+  `subagent` 委派工具。
+- 如需让子 Agent 选择模型，需要配置
+  `subagent-model-selection-settings` 允许列表，以及位于 preset 作用域内、
+  带有 `modelSelectionSettings: true` 的委派工具。Web 自带 preset 已提供该作用域。
 
 ## 安装
 
-安装到某个 dsh profile(通常是 `web`):
+在 Web profile 中安装：
 
 ```sh
-dsh plugin --profile web add dsh-multi-model-orchestrator
+dsh plugin --profile web add dsh-project-lead
 ```
 
-或从 git 仓库安装:
+从本地 checkout 安装：
 
 ```sh
-dsh plugin --profile web add github:YOU/dsh-multi-model-orchestrator
+dsh plugin --profile web add link:/absolute/path/to/dsh-project-lead
 ```
 
-之后重启 harness(或热重载 profile)。插件通过自身的 `cordis.patch.yml` 作为一个 profile 层加载。
+包内的 [bundle patch](cordis.patch.yml) 会挂载 `project-lead` row。未启用 HMR
+时，修改 profile 后请重启 harness。
+
+## 配置
+
+推荐使用 **设置 → 项目编排**，也可以把
+[examples/cordis.patch.yml](examples/cordis.patch.yml) 中的对应条目合并到
+`$DSH_HOME/profiles/<profile>/cordis.patch.yml`。profile patch 会整体替换目标
+row 的 `config:`，合并时请保留已有配置。
+
+[examples/pm-preset.patch.yml](examples/pm-preset.patch.yml) 中的可选 PM preset
+为 PM 会话保留 `read` 和 `read_image`，移除 `write` 和 `edit`，且不暴露 shell
+工具；其子 Agent 使用 Standard preset。
+
+插件 row 支持以下配置：
+
+```yaml
+- id: project-lead
+  config:
+    prompts:
+      main: compact          # compact | full | guidance | off
+      pmPreset: pm           # 接收 PM 提示的 preset；留空 = 全部顶层会话
+      otherMain: guidance    # 其他顶层会话：guidance | off
+      childRoles: true
+      defaultChildRole: executor
+      roleMarker: ROLE
+    subagent:
+      provider: glm
+      model: glm-4-flash
+      reasoningEffort: ""
+    modelNotes:
+      glm/glm-4.6:
+        description: 强推理路由。
+        strengths: complex reasoning, coding
+        weaknesses: slower and pricier
+```
+
+`modelNotes` 只是路由参考，不会授权模型。请在
+`subagent-model-selection-settings` 中授权确切的 `provider`/`model` 对。完整的
+路由、允许列表和 preset 示例见
+[examples/cordis.patch.yml](examples/cordis.patch.yml)。
 
 ## 快速开始
 
-1. **在 `$DSH_HOME/settings.yaml`(默认 `~/.dsh/settings.yaml`)加入第三方模型路由**。GLM / Kimi / Qwen 现成可粘贴的预置见 [examples/settings.yaml](examples/settings.yaml)。每个路由只需在 `apiKeyEnv` 对应的位置填一个 API Key(环境变量、`$DSH_HOME/.credentials.yaml` 或 Web「模型」页均可)。
+1. 安装插件；如果顶层会话不应编辑文件或运行命令，再应用可选的 PM preset。
+2. 配置至少一个模型路由，并将其授权给子 Agent。路由的 `apiKeyEnv` 只指定
+   环境变量或凭据库中的键名，不要把密钥本身写入 profile patch。
+3. 使用配置好的 PM preset 启动会话并提交项目任务。PM 简报应说明目标、约束、
+   验证证据，以及哪些独立部分可以派发。
 
-2. **开启子代理模型选择**,让主脑能为每个子代理挑模型:
-   ```yaml
-   subagent-model-selection:
-     enabled: true
-     allowedModels:
-       - { provider: glm, model: glm-4.6 }
-       # ...其它路由
-   ```
+子角色简报开头使用以下标记之一：
 
-3. **(可选)添加模型 Notes**,供主脑分派时参考:
-   ```yaml
-   multi-model-orchestrator:
-     modelNotes:
-       glm/glm-4.6:
-         description: 智谱旗舰，强推理。
-         strengths: 复杂推理、编码、Agent 工具调用
-         weaknesses: 较慢、较贵
-   ```
+```text
+ROLE: executor
+ROLE: reviewer
+ROLE: scout
+```
 
-4. 重启 harness 后直接提出复杂任务,例如:
-   > 把这件事拆成并行的子任务，分别派给最合适的模型。
+插件会从子请求中读取标记。没有标记时使用 `defaultChildRole`。`subagent` 调用
+会在子任务运行时立即返回 `started subagent <childId>`；完成通知会携带结果或
+失败详情。
 
-### API Key
+让主 Agent 调用 `model_token_usage`，即可查看插件进程启动以来所有带 usage 的
+模型流的输入、输出、缓存、reasoning 和请求次数。
 
-密钥在每个请求时经各路由的 `apiKeyEnv` 解析,任选其一提供:
+## 功能
 
-- **环境变量**:按你路由里写的名字,如 `GLM_API_KEY` / `KIMI_API_KEY` / `DASHSCOPE_API_KEY`。
-- **凭据库** `$DSH_HOME/.credentials.yaml`:
-  ```yaml
-  GLM_API_KEY: sk-xxxx
-  KIMI_API_KEY: sk-xxxx
-  DASHSCOPE_API_KEY: sk-xxxx
-  ```
-- **Web「模型」页**:直接粘贴 Key(写入受管凭据文档)。
+- 只为配置的 `pmPreset` 注入 PM 提示；其他顶层会话保留原有工具，并可接收
+  `otherMain` 轻量提示。
+- 为子会话注入独立的 executor、reviewer 和 scout 内置契约。
+- 支持 `compact`、`full`、`guidance`、`off` 提示模式，以及使用 `00-08` 文件名的
+  自定义提示词目录。
+- 跨会话和子 Agent 记录用量，按 `provider/model` 分组并按总用量排序；插件进程
+  重启后清空。
+- 提供 Web 设置页，用于编辑提示词作用域、子 Agent 路由、模型备注和本地化表单。
 
-未配置 Key 的路由会在请求时报 `MISSING_CREDENTIAL`,不影响其它已配置模型。
+## 文档
 
-## 主脑工作流
+- [Profile patch 示例](examples/cordis.patch.yml)
+- [PM preset 示例](examples/pm-preset.patch.yml)
+- [旧版 0.1.x settings 格式](examples/settings.yaml)
+- [English README](README.md)
 
-在主对话直接下达复杂任务即可。主脑会:
+### 从 0.1.x 迁移
 
-1. 用 `todo_write` 记录拆解出的子任务;
-2. 调用 `list_subagent_models` 查看可用路由;
-3. 通过 `subagent`(带 `provider` / `model`)把每个子任务分派给最合适的模型——在同一条消息里一起启动相互独立的委托,默认后台运行;
-4. 汇总各子代理结果,合成最终交付。
-
-> **路由名以你 profile 实际注册的为准**——示例里的 GLM / Kimi / Qwen 只是示意。如果你注册的路由在其它 provider 名下(例如 `zai` 网关),请在 `subagent-model-selection` 与 `modelNotes` 里用那些确切的 `provider`/`model` id。可用 `list_subagent_models` 查看实时列表。
-
-查看用量:让主脑调用 `model_token_usage`,或直接问「各模型用了多少 token」。
-
-## 配置参考
-
-全部在 `$DSH_HOME/settings.yaml` 中配置:
-
-| 配置段 | 作用 |
-|---|---|
-| `llm-pi-ai.providers` | OpenAI 兼容的第三方模型路由(任意厂商)。 |
-| `subagent-model-selection` | 允许子代理工具分派的 `{provider, model}` 白名单。 |
-| `multi-model-orchestrator.modelNotes` | 各路由优缺点,主脑据此分派。 |
-
-要接入自己的厂商,在 `llm-pi-ai.providers` 下按 `{ api, baseURL, apiKeyEnv, models }` 扩展(任意 `api: openai-completions` 的兼容网关均可),再在 `subagent-model-selection.allowedModels` 与 `multi-model-orchestrator.modelNotes` 补上对应条目。
-
-## 说明与限制
-
-- token 用量为**进程内累计**(重启 harness 后清零);逐条会话用量仍由内置 token meter 展示。
-- `model_token_usage` 需要自加载以来至少有一次模型调用返回了 `usage` 块,才会开始输出。
-- 编排指引为全局注入,子代理也会读到;其措辞保证子代理在聚焦单一子任务时不会递归拆解。
-- 第三方路由默认按「非推理模型」接入;如需推理开关(`reasoningEfforts` / `compat.thinkingFormat`),可在 Web「模型」页为具体模型补上。
-- **部分推理模型缺省参数会拒掉调用**:智谱 GLM-5.3 系即如此——默认参数分派会报错,显式加 `reasoning_effort`(如 `low`)后才响应。若某路由分派子代理报错而该模型本应可用,请给分派补上显式 `reasoning_effort`。请求在 API 层成功却始终 0 token 返回的路由,通常是路由/上游问题,而非编排器问题。
+DeepSeek Harness 0.2.x 会一次性导入 `$DSH_HOME/settings.yaml`，随后将其重命名为
+`settings.yaml.imported`；之后的修改不会再读取。请把配置迁移到 profile patch
+或设置页。当前 row id 为 `llm-pi-ai`、`subagent-model-selection-settings`、
+`tool-subagent` 和 `project-lead`。旧的 `subagent-model-selection` id，以及之前
+的前台/后台委派开关，都不属于 0.2.x 接口。
 
 ## 故障排查
 
-- **`ERR_MODULE_NOT_FOUND: Cannot find package '@deepseek-ai/...'`** —— 插件是手工 link 的(裸 `link:` + 手工建的 `node_modules` junction),而不是通过 `dsh plugin ... add` 正式安装。请把它装成 profile 的真实依赖并移除 junction。
-- **`model_token_usage` 显示 “No records yet”** —— 自加载以来还没有模型调用返回 usage;发一次请求再问即可。
-- **子代理无法分派到某路由 / `list_subagent_models` 为空** —— 检查 `subagent-model-selection` 是否为 `enabled: true` 且 `allowedModels` 非空,并确认这些路由存在于 `llm-pi-ai.providers`。
+- **找不到 `list_subagent_models`：** 启用
+  `subagent-model-selection-settings`，提供非空允许列表，并使用带
+  `modelSelectionSettings: true` 的 preset 作用域委派 row。
+- **`standing modelSelectionSettings requires a scoped preset Context`：** 将设置
+  移入 agent-preset 作用域，或移除它并使用已配置的子 Agent 路由。
+- **子 Agent 路由被拒绝：** 检查确切的 provider/model 是否在 `allowedModels` 中，
+  以及是否达到委派深度限制。
+- **只有 `started subagent ...` 没有结果：** 等待完成通知；启动确认不代表任务成功。
+- **`model_token_usage` 没有记录：** 插件加载后还没有带 usage 的模型流完成。
 
-## License
+## 测试
 
-MIT
+```sh
+npm test
+```
+
+测试脚本会检查 JavaScript 语法、插件配置与提示词选择、角色标记解析、用量统计、
+包兼容性以及随包发布的示例。
+
+## 许可证
+
+MIT，详见 [LICENSE](LICENSE)。
