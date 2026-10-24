@@ -137,6 +137,14 @@ Intermediate progress is not repeated as chat prose. The PM calls
 - the prompt tells the PM not to write `## PM Status`, work-package tables, or
   repeated reports; the final answer remains a short delivery summary.
 
+The three status surfaces have separate scopes: the native Goal owns the
+objective and lifecycle, the native task card owns the current turn's
+executable steps, and this card owns cross-turn work packages, verification,
+blockers, and next. When a native Goal is active, the card's title becomes the
+current focus instead of repeating the goal. On completion the collapsed card
+reduces to one compact line, and verification is shown once in the expanded
+view.
+
 The update tool still costs a small tool call; the savings come from replacing
 long, repeated status messages with compact structured updates rendered by the
 UI. If the tool is not visible, the prompt falls back to a minimal status report.

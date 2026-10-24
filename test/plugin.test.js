@@ -216,6 +216,8 @@ test("compact PM prompt includes the configured project profile and role convent
   assert.match(text, /目录、未知文件清单/);
   assert.match(text, /project_status_update/);
   assert.match(text, /不要在聊天里输出/);
+  assert.match(text, /当前 turn/);
+  assert.match(text, /工作包是跨轮交付单元/);
   assert.match(text, /todo_write/);
   assert.match(text, /model_token_usage/);
   assert.doesNotMatch(text, /run_in_background/);
