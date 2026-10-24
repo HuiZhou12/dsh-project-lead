@@ -29,6 +29,8 @@ work_package:
   verification: <命令或人工验收方式>
   dependencies: [wp-0]
   model_tier: strong | cheap
+  child: new | reuse:<child-id>   # 优先复用同角色、相邻范围的 idle child
+  reuse_budget: <默认 2 个 follow-up 或约 50% 上下文>
   budget: <时间/token/文件数/重试次数>
   report_format: <摘要/证据/路径/命令/exit code>
 ```
@@ -53,6 +55,17 @@ work_package:
 | Scout | 读代码、查路径、找 owner、确认现有行为、定位测试 | 修改、实现、审查自己的结论 |
 | Executor | 在明确边界内实现、调试、运行授权验证 | 研究开放式问题、给自己的高风险工作盖章 |
 | Reviewer | 只读、独立审查、产出 finding | 修复、扩大范围、代替 PM 验收 |
+
+## 子 Agent 池
+
+先盘点已有直接子 Agent（`list_agents` 可用时），把角色、child id、idle/running、已完成包和上下文预算写进计划。
+
+- **优先 reuse**：同角色、同项目/相邻范围、仍可继续、上下文未接近上限、没有独立性要求的 idle child → follow-up。
+- **new**：无合适 child、角色/模型不匹配、任务无关或需要全新隔离、上下文接近上限、最终独立验收需要 fresh reviewer，或复杂任务需要同角色并行。
+- 一个 child 同一时间只接一个包；同角色并行时另开。
+- 默认每个 child 最多接 2 个 follow-up 或到约 50% 上下文；超过后换新。
+- Reviewer 复用仅限不同工作包；同一修复的最终验收优先 fresh reviewer。
+- 新孩子写完整简报；follow-up 写增量简报，不复述整份项目背景。
 
 ## 模型档位
 
@@ -100,10 +113,10 @@ Batch 4：PM 集成与验收
 **Goal**：
 **Strategy**：一句话说明为什么这样拆
 
-| ID | 角色 | 交付 | 依赖 | 模型档 | 预算 | 验收 |
-|---|---|---|---|---|---|---|
-| wp-1 | scout | ... | - | cheap | ... | ... |
-| wp-2 | executor | ... | wp-1 | strong | ... | ... |
+| ID | 角色 | Child | 交付 | 依赖 | 模型档 | 预算 | 验收 |
+|---|---|---|---|---|---|---|---|
+| wp-1 | scout | reuse:abc / new | ... | - | cheap | ... | ... |
+| wp-2 | executor | reuse:def / new | ... | wp-1 | strong | ... | ... |
 
 **执行顺序**：
 **并行批次**：
@@ -117,6 +130,7 @@ Batch 4：PM 集成与验收
 - 不写代码、不运行实现或验证命令。
 - 不在依赖未满足时提前派发。
 - 不让两个包拥有同一写入路径。
+- 不为了省 child 而把不相关任务塞给同一个孩子；也不为每个包都新开孩子，浪费可复用的上下文。
 - 不接受没有验收或停止条件的工作包。
 - 不把“多派几个 Agent”当成计划；计划的核心是边界和证据。
 

@@ -99,6 +99,28 @@ The plugin reads the marker from the child request. When it is absent,
 while the child runs; the completion notice contains its result or failure
 details.
 
+### Reuse an idle child
+
+A finished child is **idle, not retired**. When the session exposes
+`list_agents` and `send_message`, the PM is instructed to reuse a continuable
+idle child before spawning another one:
+
+- reuse a same-role, same-project/adjacent-scope child with context budget left
+  via `send_message` and a delta brief;
+- spawn a new child when no suitable idle child exists, the role/model differs,
+  the work is unrelated or needs fresh isolation, context is high, or an
+  independent final review is required;
+- default to at most 2 follow-ups or about 50% context per child, then spawn
+  fresh;
+- a `send_message` is only acceptance; wait for its completion notice;
+- review reuse is limited to distinct work packages; final acceptance of a
+  repair should use a fresh Reviewer when the prior Reviewer proposed the fix.
+
+If `list_agents`/`send_message` are not visible, or a child is one-shot, the PM
+falls back to spawning a new `subagent` with a full brief. Follow-up briefs
+contain the previous package, the new objective, delta context, boundaries,
+acceptance, and report format; they do not repeat the whole project background.
+
 Ask the main agent to call `model_token_usage` to report input, output, cache,
 reasoning, and request counts for every usage-bearing model stream since the
 plugin process started.

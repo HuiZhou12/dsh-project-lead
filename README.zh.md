@@ -92,6 +92,21 @@ ROLE: scout
 会在子任务运行时立即返回 `started subagent <childId>`；完成通知会携带结果或
 失败详情。
 
+### 复用空闲子 Agent
+
+完成任务的 child 是 **idle，不是退休**。当前会话提供 `list_agents` 和
+`send_message` 时，PM 会先尝试复用可继续的空闲 child：
+
+- 同角色、同项目/相邻范围、上下文仍有余量的 idle child，用 `send_message` 发增量 follow-up；
+- 没有合适 child、角色/模型不同、任务无关或需要全新隔离、上下文已高、或最终独立验收时，新开 child；
+- 默认每个 child 最多 2 个 follow-up 或约 50% 上下文，之后换新；
+- `send_message` 只代表受理，仍要等 completion notice；
+- Reviewer 复用只用于不同工作包；同一修复的最终验收优先由 fresh Reviewer 做。
+
+如果当前会话没有 `list_agents`/`send_message`，或 child 是 one-shot，则回退到
+新开 `subagent` + 完整简报。follow-up 只写上一包、新目标、增量上下文、边界、
+验收和报告格式，不重复整份项目背景。
+
 让主 Agent 调用 `model_token_usage`，即可查看插件进程启动以来所有带 usage 的
 模型流的输入、输出、缓存、reasoning 和请求次数。
 

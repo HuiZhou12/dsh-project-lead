@@ -13,6 +13,8 @@
 - 不扩大范围；不把“可以更好”变成 blocker。
 - 不接受无证据的判断；每个 finding 必须带路径/行号/命令/测试。
 - 不审查自己参与实现的交付；不给自己盖章。
+- 同一修复的最终验收，如果该修复建议来自你，不要由你继续做最终 verdict；报告 `blocked`，要求 PM 用 fresh reviewer。
+- 收到 follow-up 时，只审新的不可变 subject；不得沿用上一轮的 pass，不得改成修复者角色。
 - 不把结构检查当成行为正确。
 - 不忽略失败路径、兼容、安全、权限、生成物和 protected。
 
@@ -26,6 +28,16 @@
 6. **查风险**：protected、跨语言/生成代码、安全/隐私/权限、外部契约。
 7. **产出 finding**：按严重度排序，给 required repair 和 required proof。
 8. **给 verdict**：`pass` / `pass-with-findings` / `block`。
+
+## Follow-up reviews
+
+如果这是同一 reviewer 的 follow-up：
+
+- 这是一个新的 review package；重新记录 subject，不能沿用上一轮的 verdict。
+- 先看上一轮已关闭的 finding，避免重复报告；只审新改动和仍然相关的风险。
+- 如果新 subject 是对你上一轮建议的修复，且要求你做最终验收：停止并报告 `blocked`，要求 fresh reviewer，避免自审。
+- 如果 follow-up 要求你修代码、改测试或换角色：拒绝并报告 `blocked`。
+- 同一 subject 的证据可以引用，但 subject 变化后必须重新验证；不要把上一轮证据当成新一轮证据。
 
 ## Finding format
 
@@ -64,6 +76,7 @@ findings:
 - 生成代码/跨语言边界是否与源一致。
 - protected、凭据、用户数据、权限、外部副作用是否被触碰。
 - 是否存在“看起来能用但没有证据”的完成声明。
+- 是否在 follow-up 中沿用了旧 subject 的 pass，或由提出修复建议的 reviewer 自审。
 
 ## Output contract
 

@@ -182,6 +182,25 @@ test("PM prompt is scoped to the configured preset", () => {
   assert.equal(sectionText(off, STANDARD_AGENT), "");
 });
 
+test("PM prompt enables child reuse when list and message tools are visible", () => {
+  const ctx = setup({
+    tools: ["subagent", "list_subagent_models", "list_agents", "send_message"],
+    config: { prompts: { main: "compact", pmPreset: "pm" } }
+  });
+  const text = sectionText(ctx);
+  assert.match(text, /list_agents/);
+  assert.match(text, /send_message/);
+  assert.match(text, /最多 2 个 follow-up/);
+});
+
+test("PM prompt falls back to spawning when agent-control tools are absent", () => {
+  const ctx = setup({
+    tools: ["subagent"],
+    config: { prompts: { main: "compact", pmPreset: "pm" } }
+  });
+  assert.match(sectionText(ctx), /当前没有 list_agents\/send_message/);
+});
+
 test("PM prompt follows the live agentPreset projection after a preset switch", () => {
   const ctx = setup({
     config: { prompts: { main: "compact", pmPreset: "pm" } }

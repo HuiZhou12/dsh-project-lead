@@ -101,10 +101,76 @@ open_questions:
 不要返回完整日志、完整 diff 或整文件源码；只返回路径、摘要和关键证据。
 ````
 
+## Follow-up 简报（复用已有 child）
+
+新工作包先查 `list_agents`（如可用）。同角色、相邻范围、仍可继续、上下文可接受的 idle child，优先用 `send_message` 发 follow-up，而不是 `subagent` 新开：
+
+```text
+send_message({
+  agent_id: "<child-id>",
+  message: "<下面的增量简报>"
+})
+```
+
+`send_message` 的 message 用增量模板，**不要**重复整份项目背景，也不要再写 `ROLE:` 改变角色：
+
+````markdown
+# Follow-up {{N}} for {{CHILD_ID}}
+
+## Previous package
+
+{{上一包完成了什么；哪些结论/文件仍有效；不要重做}}
+
+## New objective
+
+{{这一包唯一可观察目标}}
+
+## Delta context
+
+只列相对上一包的新事实、变化、输入或约束。
+
+## Scope
+
+- 必须做：{{...}}
+- 不得做：{{...}}
+- 允许写入：{{...}}
+- 禁止：{{...}}
+
+## Acceptance
+
+- {{...}}
+
+## Verification
+
+```text
+{{VERIFY_COMMANDS}}
+```
+
+## Stop conditions
+
+- 输入与已有上下文冲突；
+- 需要新角色/模型、越界路径、凭据或安装依赖；
+- 上下文压力明显、输出开始截断；
+- 验证失败且包内无法解决。
+
+## Report
+
+用原 Report format 返回本包增量：完成/阻塞、改动、命令与 exit code、证据、风险。
+不要重复上一包的报告。
+````
+
+规则：
+
+- 发送成功只代表受理；仍等 completion notice，不能当成完成。
+- 一个 child 同一时间只执行一个包；需要同角色并行时另开 child。
+- 角色不同、模型档不同、上下文接近上限、任务无关或需要独立验收时，用完整模板新开 `subagent`。
+- 一个 child 默认最多接 2 个 follow-up，或到上下文约 50%；超过后换新 child。
+- 如果 `send_message` 不可用或 child 是 one-shot，回退完整模板 + 新 `subagent`。
+
 ## 编写规则
 
-1. **自包含**：子 Agent 不需要回读主对话。
-2. **一个包一个目标**：不要把多个不相关任务塞进同一份简报。
+1. **新孩子自包含，follow-up 增量**：新 child 不需要回读主对话；复用 child 时说明上一包、新目标、增量事实，不重复整份背景。
+2. **一个包一个目标**：不要把多个不相关任务塞进同一份简报，也不要把无关任务塞给同一个 child。
 3. **明确写入边界**：`allowed_paths` 与 `forbidden` 必须具体；不要让子 Agent 自己判断“相关文件”。
 4. **明确验收**：每条 acceptance 都能被命令、测试、静态检查或人工验收证明。
 5. **明确停止**：缺输入、越界、凭据、失败、范围扩大、预算耗尽都要停。
@@ -112,6 +178,7 @@ open_questions:
 7. **不重复 owner**：同一路径只派一个 writer。
 8. **不替子 Agent 做设计**：给约束和验收，不给逐行实现指令；Scout 给问题，Executor 给边界，Reviewer 给 subject 和 finding 标准。
 9. **不泄露无关信息**：只给执行必需的事实，避免把主上下文全量复制给子 Agent。
+10. **先复用后新开**：先查 idle child；合适的用 `send_message`，没有再 `subagent`；不要每个包都新开。
 
 ## 角色变体
 
@@ -144,6 +211,8 @@ open_questions:
 - [ ] 输入是否足够，且没有让子 Agent 猜？
 - [ ] 允许/禁止路径是否具体？
 - [ ] 验证命令是否已授权、可执行？
+- [ ] 是否先查了 idle child，并写明 reuse 还是 new？
+- [ ] follow-up 是否只给增量、没有改变角色或重复整份背景？
 - [ ] 是否只有一个 writer？
 - [ ] 是否设置了报告上限和停止条件？
 - [ ] 模型/角色是否匹配任务风险？
@@ -155,6 +224,8 @@ open_questions:
 - 只写“实现 X”，没有验收和停止条件。
 - 把完整 diff、几千行日志粘进简报。
 - 同一批文件同时派两个 Executor。
+- 每个包都新开 child，让已完成的同角色 idle child 一直闲着。
+- follow-up 又写一遍完整项目背景，或者用 follow-up 偷换 child 的角色。
 - 让 Executor 自己决定是否 commit/push。
 - 让 Reviewer 修代码或给自己的实现盖章。
 - 子 Agent 报告没有路径/命令/exit code，主 Agent 却直接接受。
