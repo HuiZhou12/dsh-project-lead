@@ -30,11 +30,13 @@ function createCtx(tools = ["subagent", "list_subagent_models"]) {
   const sections = [];
   const registered = [];
   const listeners = new Map();
+  const projections = [];
   const visible = new Map(tools.map((tool) => [tool, { name: tool }]));
   return {
     sections,
     registered,
     listeners,
+    projections,
     on(event, handler, options) {
       listeners.set(event, { handler, options });
     },
@@ -46,9 +48,18 @@ function createCtx(tools = ["subagent", "list_subagent_models"]) {
     tools: {
       register(tool) {
         registered.push(tool);
+        visible.set(tool.name, tool);
       },
       get(toolName) {
         return visible.get(toolName);
+      }
+    },
+    sessionProjections: {
+      register(definition) {
+        projections.push(definition);
+      },
+      stateOf() {
+        return undefined;
       }
     }
   };
@@ -58,6 +69,12 @@ function setup(options = {}) {
   const ctx = createCtx(options.tools);
   apply(ctx, options.config ?? {});
   return ctx;
+}
+
+function getTool(ctx, toolName) {
+  const tool = ctx.registered.find((entry) => entry.name === toolName);
+  assert.ok(tool, `${toolName} was registered`);
+  return tool;
 }
 
 function sectionText(ctx, agent = TOP_LEVEL) {
@@ -87,7 +104,7 @@ function openStream(ctx, provider, model, chunks) {
 
 test("exports stable plugin metadata", () => {
   assert.equal(name, "project-lead");
-  assert.deepEqual(inject, ["systemPrompt", "tools"]);
+  assert.deepEqual(inject, ["systemPrompt", "tools", "sessionProjections"]);
   assert.deepEqual(read(Config({}).modelNotes), {});
   assert.equal(read(Config({}).prompts).main, "compact");
   assert.equal(read(Config({}).prompts).childRoles, true);
@@ -105,17 +122,73 @@ test("exports stable plugin metadata", () => {
   assert.equal(typeof Config({}).subagent.get, "function");
 });
 
-test("registers the prompt section and usage tool without a settings service", () => {
+test("registers the prompt section, status projection, and tools without a settings service", () => {
   const ctx = setup();
 
   assert.equal(ctx.sections.length, 1);
   assert.equal(ctx.sections[0].name, "project-lead-orchestration");
   assert.equal(ctx.sections[0].order, 400);
 
-  assert.equal(ctx.registered.length, 1);
-  assert.equal(ctx.registered[0].name, "model_token_usage");
-  assert.match(ctx.registered[0].description, /process-wide/);
-  assert.match(ctx.registered[0].description, /not the built-in per-session token meter/);
+  assert.equal(ctx.projections.length, 1);
+  assert.equal(ctx.projections[0].key, "projectLeadStatus");
+  assert.equal(ctx.projections[0].init(), null);
+
+  assert.equal(ctx.registered.length, 2);
+  const usage = getTool(ctx, "model_token_usage");
+  assert.match(usage.description, /process-wide/);
+  assert.match(usage.description, /not the built-in per-session token meter/);
+  assert.ok(getTool(ctx, "project_status_update"));
+});
+
+test("project_status_update appends a compact event and the projection applies it", async () => {
+  const ctx = setup();
+  const tool = getTool(ctx, "project_status_update");
+  let appended;
+  const agent = {
+    options: {},
+    session: {
+      append(type, data) {
+        appended = { type, data };
+      }
+    }
+  };
+
+  const result = await tool.execute({
+    goal: "Ship the status card",
+    summary: "Building the dock",
+    phase: "executing",
+    done: 1,
+    total: 3,
+    activeAgents: 2,
+    verification: "Not run",
+    next: "Review the dock",
+    workPackages: [
+      { id: "wp-1", title: "Build card", role: "executor", owner: "child-1", state: "done", evidence: "tests pass" },
+      { id: "wp-2", title: "Review card", role: "reviewer", state: "pending" }
+    ]
+  }, { agent });
+
+  assert.equal(result, "Project status updated.");
+  assert.equal(appended.type, "project-lead/status");
+  assert.equal(appended.data.status.goal, "Ship the status card");
+  assert.equal(appended.data.status.phase, "executing");
+  assert.equal(appended.data.status.done, 1);
+  assert.equal(appended.data.status.workPackages.length, 2);
+  assert.ok(appended.data.status.updatedAt > 0);
+
+  const projected = ctx.projections[0].apply(null, {
+    type: "project-lead/status",
+    data: appended.data
+  });
+  assert.equal(projected.goal, "Ship the status card");
+  assert.equal(projected.workPackages[1].state, "pending");
+});
+
+test("child agents cannot update the top-level project status", async () => {
+  const ctx = setup();
+  const tool = getTool(ctx, "project_status_update");
+  const child = { options: { subagentDepth: 1 }, session: { append() {} } };
+  await assert.rejects(() => tool.execute({ phase: "executing" }, { agent: child }), /top-level Project Lead/);
 });
 
 test("compact PM prompt includes the configured project profile and role convention", () => {
@@ -141,6 +214,8 @@ test("compact PM prompt includes the configured project profile and role convent
   assert.match(text, /billing/);
   assert.match(text, /ROLE: executor/);
   assert.match(text, /目录、未知文件清单/);
+  assert.match(text, /project_status_update/);
+  assert.match(text, /不要在聊天里输出/);
   assert.match(text, /todo_write/);
   assert.match(text, /model_token_usage/);
   assert.doesNotMatch(text, /run_in_background/);
@@ -353,7 +428,7 @@ test("usage is grouped per provider/model and counts one request per stream", as
     { type: "usage", usage: { inputTokens: 99, outputTokens: 99 } }
   ]));
 
-  const output = await ctx.registered[0].execute({});
+  const output = await getTool(ctx, "model_token_usage").execute({});
   assert.match(output, /process-wide/);
   assert.match(
     output,
@@ -379,12 +454,12 @@ test("usage is committed when the consumer stops early", async () => {
     if (chunk.type === "usage") break;
   }
 
-  const output = await ctx.registered[0].execute({});
+  const output = await getTool(ctx, "model_token_usage").execute({});
   assert.match(output, /p\/m: input 4, output 2, cache read 0, cache write 0, total 6, 1 request\(s\)/);
 });
 
 test("usage tool reports an empty state before any usage arrives", async () => {
   const ctx = setup();
-  const output = await ctx.registered[0].execute({});
+  const output = await getTool(ctx, "model_token_usage").execute({});
   assert.match(output, /No records yet/);
 });

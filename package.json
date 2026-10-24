@@ -1,6 +1,6 @@
 {
   "name": "dsh-project-lead",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A DeepSeek Harness 0.2.x plugin: a Project Lead / Project Manager main agent that delegates implementation to subagents, injects bundled PM/executor/reviewer/scout role prompts, reports per-model token usage, and ships a first-party Settings-page UI for prompt scope and subagent routing.",
   "type": "module",
   "main": "lib/index.js",
@@ -13,6 +13,7 @@
   "files": [
     "lib",
     "prompts",
+    "docs",
     "cordis.patch.yml",
     "examples",
     "README.md",
@@ -38,7 +39,8 @@
     "plugin"
   ],
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.2"
+    "@deepseek-ai/schemastery": "^3.18.2",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.5",
@@ -74,7 +76,8 @@
       "inject": [
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-api-remotes"
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-conversation"
       ],
       "platform": "web"
     }

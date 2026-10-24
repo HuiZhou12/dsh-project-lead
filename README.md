@@ -121,6 +121,30 @@ falls back to spawning a new `subagent` with a full brief. Follow-up briefs
 contain the previous package, the new objective, delta context, boundaries,
 acceptance, and report format; they do not repeat the whole project background.
 
+### Project status card
+
+Intermediate progress is not repeated as chat prose. The PM calls
+`project_status_update`, and the client renders a card docked above the composer:
+
+- default collapsed: goal, short summary, phase, `done/total` progress, active
+  agent count, verification state, and last update;
+- expanded: work packages with role/owner/evidence, verification result, next
+  step, and blockers;
+- first update carries the complete state; later updates may send only changed
+  fields, and `workPackages` replaces the list when provided;
+- only the top-level Project Lead may update the card; a child agent receives an
+  error instead of writing into the parent's status;
+- the prompt tells the PM not to write `## PM Status`, work-package tables, or
+  repeated reports; the final answer remains a short delivery summary.
+
+The update tool still costs a small tool call; the savings come from replacing
+long, repeated status messages with compact structured updates rendered by the
+UI. If the tool is not visible, the prompt falls back to a minimal status report.
+
+![Collapsed status card](docs/status-card-collapsed.png)
+
+![Expanded status card](docs/status-card-expanded.png)
+
 Ask the main agent to call `model_token_usage` to report input, output, cache,
 reasoning, and request counts for every usage-bearing model stream since the
 plugin process started.
@@ -131,6 +155,8 @@ plugin process started.
   sessions keep their normal tools and receive `otherMain` guidance when enabled.
 - Injects separate bundled executor, reviewer, and scout contracts into child
   sessions.
+- Projects structured PM status into a collapsible composer-dock card; the PM
+  updates it with `project_status_update` instead of narrating progress in chat.
 - Supports `compact`, `full`, `guidance`, and `off` prompt modes plus an optional
   custom prompt directory using the bundled `00-08` filenames.
 - Tracks usage across sessions and sub-agents, grouped and sorted by

@@ -130,7 +130,7 @@ test("manifest remains a mount-only bundle with optional peers", () => {
 });
 
 test("no 0.1.x compatibility branch is advertised", () => {
-  assert.equal(manifest.version, "0.5.0");
+  assert.equal(manifest.version, "0.6.0");
   assert.doesNotMatch(
     JSON.stringify(manifest.peerDependencies),
     /0\.1\./
@@ -157,7 +157,7 @@ test("bundled role prompts are published with the package", () => {
   }
 });
 
-test("client Settings-page module is packaged", () => {
+test("client Settings-page and status-card modules are packaged", () => {
   assert.equal(manifest.exports["./client"], "./lib/client.js");
   assert.equal(manifest.dsh?.client?.platform, "web");
   assert.ok(
@@ -168,6 +168,10 @@ test("client Settings-page module is packaged", () => {
     manifest.dsh?.client?.inject?.includes("@deepseek-ai/dsh-client-locale"),
     "client injects the locale service"
   );
+  assert.ok(
+    manifest.dsh?.client?.inject?.includes("@deepseek-ai/dsh-client-ui-conversation"),
+    "client injects the conversation UI service"
+  );
   const client = readFileSync(new URL("../lib/client.js", import.meta.url), "utf8");
   assert.match(client, /__ModuleLoader__\.load/);
   assert.match(client, /settings\.section/);
@@ -175,6 +179,8 @@ test("client Settings-page module is packaged", () => {
   assert.match(client, /SettingsForm/);
   assert.match(client, /SettingsValueField/);
   assert.match(client, /pl-subagent-model/);
+  assert.match(client, /conversation\.input\.dock/);
+  assert.match(client, /projectLeadStatus/);
   assert.match(client, /project-lead/);
 });
 

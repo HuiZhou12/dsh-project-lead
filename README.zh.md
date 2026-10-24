@@ -107,6 +107,26 @@ ROLE: scout
 新开 `subagent` + 完整简报。follow-up 只写上一包、新目标、增量上下文、边界、
 验收和报告格式，不重复整份项目背景。
 
+### 项目状态卡
+
+中间进度不再写成聊天长文。PM 调用 `project_status_update`，客户端在输入框上方
+渲染一张可收起的状态卡：
+
+- 默认收起：目标、简短说明、阶段、`done/total` 进度、运行中的 Agent 数、验证状态
+  和最后更新时间；
+- 展开：工作包及其角色/执行者/证据、验证结果、下一步和阻塞；
+- 第一次调用给完整状态；后续可只传变化字段，`workPackages` 提供时整表替换；
+- 只有顶层 Project Lead 能更新状态卡；子 Agent 调用会报错，不能写父会话状态；
+- 提示词要求 PM 不再输出 `## PM 状态`、工作包表格或重复汇报；最终回复只保留简短
+  交付摘要。
+
+工具调用本身仍会消耗少量 token；节省来自把反复出现的状态长文换成紧凑的结构化
+更新，由 UI 展示细节。如果工具不可见，提示词会回退到极简状态文字。
+
+![收起状态卡](docs/status-card-collapsed.png)
+
+![展开状态卡](docs/status-card-expanded.png)
+
 让主 Agent 调用 `model_token_usage`，即可查看插件进程启动以来所有带 usage 的
 模型流的输入、输出、缓存、reasoning 和请求次数。
 
@@ -115,6 +135,8 @@ ROLE: scout
 - 只为配置的 `pmPreset` 注入 PM 提示；其他顶层会话保留原有工具，并可接收
   `otherMain` 轻量提示。
 - 为子会话注入独立的 executor、reviewer 和 scout 内置契约。
+- 将结构化的 PM 状态投影到输入框上方的可收起卡片；PM 用
+  `project_status_update` 更新，不再在聊天里叙述进度。
 - 支持 `compact`、`full`、`guidance`、`off` 提示模式，以及使用 `00-08` 文件名的
   自定义提示词目录。
 - 跨会话和子 Agent 记录用量，按 `provider/model` 分组并按总用量排序；插件进程
