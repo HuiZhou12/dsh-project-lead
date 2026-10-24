@@ -140,6 +140,7 @@ test("compact PM prompt includes the configured project profile and role convent
   assert.match(text, /npm test/);
   assert.match(text, /billing/);
   assert.match(text, /ROLE: executor/);
+  assert.match(text, /目录、未知文件清单/);
   assert.match(text, /todo_write/);
   assert.match(text, /model_token_usage/);
   assert.doesNotMatch(text, /run_in_background/);
@@ -179,6 +180,27 @@ test("PM prompt is scoped to the configured preset", () => {
     config: { prompts: { main: "compact", pmPreset: "pm", otherMain: "off" } }
   });
   assert.equal(sectionText(off, STANDARD_AGENT), "");
+});
+
+test("PM prompt follows the live agentPreset projection after a preset switch", () => {
+  const ctx = setup({
+    config: { prompts: { main: "compact", pmPreset: "pm" } }
+  });
+  const presets = new Map();
+  ctx.get = (service) => service === "sessionProjections"
+    ? { stateOf: (_session, key) => key === "agentPreset" ? presets.get(key) : undefined }
+    : undefined;
+
+  const switched = { options: {}, session: { header: { agentPreset: "standard" } } };
+  presets.set("agentPreset", "pm");
+  const pmText = sectionText(ctx, switched);
+  assert.match(pmText, /Project Manager/);
+  assert.doesNotMatch(pmText, /You are the orchestrating agent/);
+
+  presets.set("agentPreset", "standard");
+  const standardText = sectionText(ctx, switched);
+  assert.doesNotMatch(standardText, /Project Manager/);
+  assert.match(standardText, /You are the orchestrating agent/);
 });
 
 test("an empty pmPreset makes the PM prompt apply to every top-level session", () => {
