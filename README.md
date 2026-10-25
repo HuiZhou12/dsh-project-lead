@@ -269,6 +269,30 @@ child completion. The Web client renders a collapsible card above the composer:
 
 ![Expanded project status card](docs/status-card-expanded.png)
 
+### Sessions written by 0.6.1 and earlier
+
+Older versions appended a custom `project-lead/status` event with no
+`ignorable` marker. A current Harness refuses to open a log containing an
+unknown required event, which surfaces as:
+
+```text
+failed to observe session "...": ... contains event type "project-lead/status"
+(seq 44) unknown to this harness and not marked ignorable
+```
+
+Version 0.6.2 stores status in the standard `tool/result` presentation meta, so
+new sessions never contain that event. Repair an existing log with the bundled
+migration script (Node.js 22.15+ or 24+; it keeps a timestamped `.bak-*` copy):
+
+```powershell
+node scripts/migrate-status-events.mjs --write "$HOME\.dsh\sessions"
+```
+
+The script scans recursively when given a directory, or accepts one or more
+`.jsonl.zstd` files. It renames only the legacy records to the ignorable
+`plugin:project-lead/status` type, preserving sequence numbers and frame
+layout. Run it without `--write` first to see what it would change.
+
 ### Token accounting
 
 The plugin observes every global `llm/stream`, including child calls. Streams
@@ -286,6 +310,7 @@ separate from the Harness per-session token meter.
 lib/index.js       Runtime plugin, prompt gating, tools, and accounting
 lib/prompts.js      Prompt loading, role parsing, and rendering
 lib/client.js       Web Settings page and status-card client module
+scripts/            One-shot session repair utilities
 prompts/            Bundled PM and child-role Markdown prompts
 examples/           Profile, PM preset, and legacy settings examples
 docs/               Status-card screenshots

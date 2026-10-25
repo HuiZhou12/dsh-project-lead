@@ -235,6 +235,28 @@ PM 提示要求 Agent 记录工作包，在可见 `list_subagent_models` 时先�
 
 ![展开的项目状态卡片](docs/status-card-expanded.png)
 
+### 0.6.1 及更早版本写出的会话
+
+旧版本会把自定义 `project-lead/status` 事件写进 session log，且没有
+`ignorable` 标记。当前 Harness 遇到未知必需事件时会拒绝打开整份日志，表现为：
+
+```text
+failed to observe session "...": ... contains event type "project-lead/status"
+(seq 44) unknown to this harness and not marked ignorable
+```
+
+0.6.2 改为把状态放进标准 `tool/result` 的 presentation meta，新会话不再产生该事件。
+修复旧日志可使用仓库内的迁移脚本（需要 Node.js 22.15+ 或 24+，会自动保留带时间戳的
+`.bak-*` 备份）：
+
+```powershell
+node scripts/migrate-status-events.mjs --write "$HOME\.dsh\sessions"
+```
+
+脚本接受目录（递归扫描）或一个/多个 `.jsonl.zstd` 文件；只把旧事件改名为可忽略的
+`plugin:project-lead/status`，保留 seq、时间和原有帧布局。先不带 `--write` 运行可以
+预览将要修改的内容。
+
 ### Token 统计
 
 插件观察全局 `llm/stream`，包括子 Agent 调用。provider 和 model 任一为空的流会被忽略；
@@ -249,6 +271,7 @@ output 的子集，不会重复相加。数据覆盖插件进程启动以来的�
 lib/index.js       运行时插件、提示门控、工具和 token 统计
 lib/prompts.js      提示词加载、角色解析和渲染
 lib/client.js       Web 设置页与状态卡片客户端模块
+scripts/            一次性会话修复工具
 prompts/            内置 PM 与子角色 Markdown 提示词
 examples/           profile、PM preset 和旧版 settings 示例
 docs/               状态卡片截图

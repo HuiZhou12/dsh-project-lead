@@ -131,6 +131,7 @@ test("registers the prompt section, status projection, and tools without a setti
 
   assert.equal(ctx.projections.length, 1);
   assert.equal(ctx.projections[0].key, "projectLeadStatus");
+  assert.equal(ctx.projections[0].stateVersion, 2);
   assert.equal(ctx.projections[0].init(), null);
 
   assert.equal(ctx.registered.length, 2);
@@ -140,20 +141,19 @@ test("registers the prompt section, status projection, and tools without a setti
   assert.ok(getTool(ctx, "project_status_update"));
 });
 
-test("project_status_update appends a compact event and the projection applies it", async () => {
+test("project_status_update persists status in tool-result meta, not a custom event", async () => {
   const ctx = setup();
   const tool = getTool(ctx, "project_status_update");
-  let appended;
+  let appended = 0;
   const agent = {
     options: {},
     session: {
-      append(type, data) {
-        appended = { type, data };
+      append() {
+        appended += 1;
       }
     }
   };
-
-  const result = await tool.execute({
+  const args = {
     goal: "Ship the status card",
     summary: "Building the dock",
     phase: "executing",
@@ -166,22 +166,65 @@ test("project_status_update appends a compact event and the projection applies i
       { id: "wp-1", title: "Build card", role: "executor", owner: "child-1", state: "done", evidence: "tests pass" },
       { id: "wp-2", title: "Review card", role: "reviewer", state: "pending" }
     ]
-  }, { agent });
+  };
 
+  const result = await tool.execute(args, { agent });
   assert.equal(result, "Project status updated.");
-  assert.equal(appended.type, "project-lead/status");
-  assert.equal(appended.data.status.goal, "Ship the status card");
-  assert.equal(appended.data.status.phase, "executing");
-  assert.equal(appended.data.status.done, 1);
-  assert.equal(appended.data.status.workPackages.length, 2);
-  assert.ok(appended.data.status.updatedAt > 0);
+  assert.equal(appended, 0);
+  assert.equal(typeof tool.output.presentationMeta, "function");
 
+  const meta = tool.output.presentationMeta(args);
+  assert.equal(meta.projectLeadStatus.status.goal, "Ship the status card");
   const projected = ctx.projections[0].apply(null, {
-    type: "project-lead/status",
-    data: appended.data
+    type: "tool/result",
+    time: 12345,
+    data: { meta }
   });
   assert.equal(projected.goal, "Ship the status card");
+  assert.equal(projected.phase, "executing");
+  assert.equal(projected.done, 1);
+  assert.equal(projected.workPackages.length, 2);
   assert.equal(projected.workPackages[1].state, "pending");
+  assert.equal(projected.updatedAt, 12345);
+
+  const partial = ctx.projections[0].apply(projected, {
+    type: "tool/result",
+    time: 13000,
+    data: { meta: { projectLeadStatus: { status: { phase: "reviewing" } } } }
+  });
+  assert.equal(partial.phase, "reviewing");
+  assert.equal(partial.goal, "Ship the status card");
+  assert.equal(partial.done, 1);
+  assert.equal(partial.workPackages.length, 2);
+  assert.equal(partial.updatedAt, 13000);
+});
+
+test("the projection still folds legacy and migrated status records", () => {
+  const ctx = setup();
+  const legacyStatus = {
+    goal: "Legacy goal",
+    phase: "done",
+    done: 1,
+    total: 1,
+    workPackages: [{ id: "wp-1", title: "Old", state: "done" }],
+    updatedAt: 777
+  };
+  const legacy = ctx.projections[0].apply(null, {
+    type: "project-lead/status",
+    time: 999,
+    data: { status: legacyStatus }
+  });
+  assert.equal(legacy.goal, "Legacy goal");
+  assert.equal(legacy.updatedAt, 777);
+
+  const migrated = ctx.projections[0].apply(null, {
+    type: "plugin:project-lead/status",
+    time: 1000,
+    data: { status: legacyStatus }
+  });
+  assert.equal(migrated.goal, "Legacy goal");
+  assert.equal(migrated.phase, "done");
+  assert.equal(migrated.workPackages[0].state, "done");
 });
 
 test("child agents cannot update the top-level project status", async () => {
