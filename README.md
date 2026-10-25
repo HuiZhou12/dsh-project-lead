@@ -2,78 +2,109 @@
 
 [![MIT Licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
 
-`dsh-project-lead` is a DeepSeek Harness 0.2.x plugin that turns a top-level
-agent into a Project Manager for planning, decomposition, dispatch, acceptance,
-and reporting. Delegated children receive executor, reviewer, or scout contracts,
-while the plugin records process-wide token usage by `provider/model`.
+`dsh-project-lead` is a DeepSeek Harness 0.2.x plugin that gives a top-level
+agent a project-management workflow. The Project Lead plans and decomposes a
+task, dispatches self-contained work packages, accepts evidence from child
+agents, and reports the result. Children receive one of three focused role
+contracts: `executor`, `reviewer`, or `scout`.
 
-## Advantages
+The plugin also provides a Web Settings page, an optional read-only Project
+Manager preset, a collapsible project status card, and process-wide token
+accounting grouped by `provider/model`.
 
-- **Separated responsibilities:** the PM owns goals, plans, and acceptance;
-  Executors implement; Reviewers perform independent read-only checks; Scouts
-  gather repository facts without changing files.
-- **Scoped prompts:** the PM contract is injected only into the configured PM
-  preset. Standard sessions keep their normal tools and behavior.
-- **Clear tool boundary:** the optional PM preset keeps `read` / `read_image`,
-  removes `write` / `edit`, and has no shell; children switch to Standard for
-  code-capable execution.
-- **Controlled model routing:** child selection is restricted to exact
-  `provider/model` pairs in `allowedModels`. Model notes guide assignment but do
-  not grant access.
-- **Context and cost control:** independent packages run in parallel; related
-  follow-ups can reuse an idle child; the PM can inspect process-wide usage with
-  `model_token_usage`.
-- **Evidence-based completion:** `started subagent` means accepted for execution,
-  not successful. Completion notices carry the result, failure diagnostics, and
-  any partial output for acceptance.
-- **Repository-native configuration:** the Web Settings page, profile patch,
-  bundled role prompts, and custom prompt directory are supported together.
+中文文档：[README.zh.md](README.zh.md)
+
+## What it provides
+
+- **Scoped orchestration prompts.** `compact` and `full` Project Manager
+  prompts apply only to the configured PM preset. Other top-level sessions can
+  keep their normal tools and receive lightweight guidance or no guidance.
+- **Role-specific children.** A `ROLE: executor`, `ROLE: reviewer`, or
+  `ROLE: scout` marker selects the child contract. Children do not receive the
+  PM contract and are instructed not to delegate again.
+- **A clear tool boundary.** The optional PM preset keeps `read` and
+  `read_image`, removes `write`, `edit`, and shell tools, and sends children to
+  a code-capable preset such as `standard`.
+- **Controlled model routing.** When model selection is enabled, only exact
+  `provider/model` pairs in `allowedModels` can be selected. `modelNotes` adds
+  dispatch advice but never grants access.
+- **Child reuse and parallel dispatch.** When `list_agents` and `send_message`
+  are available, related follow-ups can reuse an idle child; independent work
+  packages can be launched together.
+- **Evidence-based acceptance.** `started subagent <childId>` means that a
+  child was accepted for execution. The completion notice carries its result,
+  failure diagnostics, and any partial output.
+- **Project status card.** The top-level agent can update work packages,
+  owners, evidence, verification, blockers, and the next step above the
+  composer with `project_status_update`.
+- **Token accounting.** `model_token_usage` reports input, output, cache,
+  reasoning, total, and request counts for every usage-bearing model stream
+  seen by the plugin process.
 
 ## Requirements
 
-- DeepSeek Harness `>=0.2.1-rc.2 <0.3.0-0`; verified on `0.2.1-rc.2`.
-- A profile that mounts `dsh-system-prompt`, `dsh-tools`, `dsh-llm`, and a
+- DeepSeek Harness `>=0.2.1-rc.2 <0.3.0-0` (verified against
+  `0.2.1-rc.2`).
+- A profile that provides `dsh-system-prompt`, `dsh-tools`, `dsh-llm`, and a
   `subagent` delegation tool.
-- For child model selection, an enabled `subagent-model-selection-settings`
-  allow-list and a preset-scoped delegation tool with
-  `modelSelectionSettings: true`. Shipped Web presets provide the required
-  scope.
+- For selectable child models, an enabled
+  `subagent-model-selection-settings` row with a non-empty allow-list and a
+  preset-scoped delegation tool whose `modelSelectionSettings` is `true`.
+  The shipped Web `standard`, `ptc`, and `cordis` presets provide this scope.
+
+The package declares `@deepseek-ai/cordis` `^4.0.5` and matching 0.2.x
+DeepSeek Harness peer packages as optional peers; the host supplies them.
 
 ## Installation
 
-Install the plugin in a Web profile:
+Install the published plugin in a Web profile:
 
 ```sh
 dsh plugin --profile web add dsh-project-lead
 ```
 
-For a local checkout:
+To load a local checkout instead:
 
 ```sh
 dsh plugin --profile web add link:/absolute/path/to/dsh-project-lead
 ```
 
-The package's [bundle patch](cordis.patch.yml) mounts the `project-lead` row.
-Restart the harness after profile changes when HMR is not enabled.
+The package bundle mounts its `project-lead` row through
+[cordis.patch.yml](cordis.patch.yml). Restart the Harness after profile
+changes when hot reload is not enabled.
+
+## Quick start
+
+1. Install the plugin. If the top-level agent must not edit files or run
+   commands, add [the PM preset](examples/pm-preset.patch.yml) and select `pm`.
+2. Configure a default child route, or enable model selection and authorize
+   exact routes in `allowedModels`.
+3. Give the Project Lead a goal, constraints, acceptance evidence, and the
+   independent parts that may be delegated.
+4. Begin every child brief with one marker:
+
+   ```text
+   ROLE: executor
+   ROLE: reviewer
+   ROLE: scout
+   ```
+
+   Without a marker, `prompts.defaultChildRole` (`executor` by default) is
+   used. Child briefs must be self-contained because children cannot see the
+   parent conversation.
 
 ## Configuration
 
-Use **Settings → 项目编排** for plugin settings, or merge the equivalent entries
-from [examples/cordis.patch.yml](examples/cordis.patch.yml) into
-`$DSH_HOME/profiles/<profile>/cordis.patch.yml`. A profile patch replaces a
-target row's whole `config:` value, so preserve existing values when merging.
+Use **Settings -> Project Lead** in the Web client for prompt scope, the
+default child route, reasoning effort, the child-model allow-list, and model
+notes. The equivalent profile patch is shown in
+[examples/cordis.patch.yml](examples/cordis.patch.yml). Merge the entries into
+`$DSH_HOME/profiles/<profile>/cordis.patch.yml`; a patch replaces a target
+row's whole `config:` value, so preserve existing settings when merging.
 
-### PM preset and tool boundary
-
-Prompt injection alone does not remove tools. The optional PM preset in
-[examples/pm-preset.patch.yml](examples/pm-preset.patch.yml) provides the actual
-boundary:
-
-- PM sessions keep `read` / `read_image`;
-- PM sessions remove `write` / `edit` and do not include `pwsh` / `bash`;
-- children use `agentPreset: standard` and retain code tools;
-- Standard remains the default preset for small tasks that do not need
-  decomposition.
+The Settings page does not expose the project profile. Configure `project`
+fields in the profile patch when you want repository facts appended to PM and
+child prompts.
 
 ### Plugin configuration
 
@@ -82,12 +113,23 @@ boundary:
   config:
     prompts:
       main: compact          # compact | full | guidance | off
-      pmPreset: pm           # preset receiving the PM prompt; empty = all
+      pmPreset: pm           # preset receiving the PM contract; empty = all
       otherMain: guidance    # other top-level sessions: guidance | off
       childRoles: true
       defaultChildRole: executor
       roleMarker: ROLE
       # dir: /optional/custom/prompt/directory
+    project:
+      name: my-project
+      stack: Node.js
+      verifyCommands:
+        - npm test
+      allowedPaths: [lib/**]
+      forbiddenPaths: [.env]
+      protectedCapabilities: [billing]
+      conventions: [keep changes small]
+      humanValidation: [verify the Web status card]
+      notes: Additional project context for the PM.
     subagent:
       provider: glm
       model: glm-4-flash
@@ -99,141 +141,36 @@ boundary:
         weaknesses: slower and pricier
 ```
 
-| Setting | Default | Meaning |
+| Key | Default | Description |
 |---|---|---|
-| `prompts.main` | `compact` | `compact`, `full`, legacy lightweight `guidance`, or `off`. `compact` / `full` use the PM contract only for `pmPreset` sessions. |
-| `prompts.pmPreset` | `pm` | Preset id receiving the PM contract; empty applies it to every top-level session. |
-| `prompts.otherMain` | `guidance` | Prompt for non-PM top-level sessions: `guidance` or `off`. |
-| `prompts.childRoles` | `true` | Inject executor/reviewer/scout contracts into child sessions. |
-| `prompts.defaultChildRole` | `executor` | Role used when the brief has no role marker. |
+| `prompts.main` | `compact` | `compact`, `full`, legacy `guidance`, or `off`. `compact` and `full` use the PM contract only in `pmPreset`. |
+| `prompts.pmPreset` | `pm` | Preset receiving the PM contract; empty applies it to every top-level session. |
+| `prompts.otherMain` | `guidance` | Guidance or `off` for other top-level presets. |
+| `prompts.childRoles` | `true` | Inject the executor/reviewer/scout contract into children. |
+| `prompts.defaultChildRole` | `executor` | Role used when a brief has no valid marker. |
 | `prompts.roleMarker` | `ROLE` | Prefix parsed from a line such as `ROLE: scout`. |
-| `prompts.dir` | bundled | Custom Markdown prompt directory using `00-project-manager.md` through `08-scout.md`; missing files fall back to bundled prompts. |
-| `subagent.provider/model` | empty | Default route the PM passes to children; empty values leave route choice to the authorized session. |
+| `prompts.dir` | bundled | Custom directory using `00-project-manager.md` through `08-scout.md`; missing files fall back to bundled prompts. |
+| `project.*` | empty | Optional project facts. An empty `project.root` uses the session working directory. |
+| `subagent.provider/model` | empty | Default route passed by the PM. Empty values leave route selection to the authorized session. |
 | `subagent.reasoningEffort` | empty | Passed only when the selected model advertises that effort. |
-| `modelNotes` | `{}` | `provider/model` routing notes with optional `description`, `strengths`, and `weaknesses`; not an authorization list. |
+| `modelNotes` | `{}` | Per-route dispatch advice; it is not an authorization list. |
 
-## Quick start
+### PM preset and permissions
 
-1. Install the plugin and apply the optional PM preset if the top-level session
-   must not edit files or run commands.
-2. Configure at least one model route and authorize it for children. Its
-   `apiKeyEnv` names an environment variable or credential-store key; do not put
-   the secret itself in the profile patch.
-3. Start a session with the configured PM preset and give it a project task.
-   The PM brief should state the goal, constraints, acceptance evidence, and
-   independent parts that may be delegated.
+Prompt text alone does not remove tools. The optional preset in
+[examples/pm-preset.patch.yml](examples/pm-preset.patch.yml) provides the
+boundary:
 
-Begin each child brief with one of:
+- the PM keeps `read` and `read_image`;
+- the PM omits `write`, `edit`, `pwsh`, and `bash`;
+- the delegation tool sends children to `agentPreset: standard`;
+- Standard remains the default for small tasks that do not need decomposition.
 
-```text
-ROLE: executor
-ROLE: reviewer
-ROLE: scout
-```
+### Model routes and authorization
 
-The plugin reads the marker from the child request. Without one,
-`defaultChildRole` applies. A `subagent` call returns `started subagent <childId>`
-while the child runs; the completion notice carries its result or failure details.
-
-## Runtime behavior
-
-The plugin uses the public `systemPrompt`, `tools`, and `llm/stream` extension
-points. It does not patch Harness internals. Each model request is assembled
-through the following paths.
-
-### Prompt assembly
-
-For each system-prompt assembly, the plugin checks delegation depth, visible
-tools, the active preset projection, and the `project-lead` configuration:
-
-1. A child with delegation depth greater than zero receives the contract selected
-   by its `ROLE:` marker. It does not receive the PM contract or instructions to
-   delegate again.
-2. An agent without a visible `subagent` tool receives no orchestration prompt.
-3. `main: off` disables the orchestration section.
-4. A top-level session outside `pmPreset` receives `otherMain` (lightweight
-   guidance by default) and keeps its preset's tools.
-5. A top-level PM session receives `compact` or `full`. `compact` includes the
-   PM core, phase checklist, and dispatch convention; `full` also includes the
-   intake, planning, review, and status contracts.
-
-The plugin prefers the live `agentPreset` session projection after a runtime
-preset switch and falls back to the session header in older compositions.
-
-### Dispatch and child reuse
-
-The PM contract instructs the agent to record work packages, inspect authorized
-routes when `list_subagent_models` is visible, write self-contained briefs, launch
-independent packages together, and accept results only with evidence.
-
-When both `list_agents` and `send_message` are visible, the PM checks for an idle
-continuable child before spawning a related follow-up:
-
-- reuse a same-role, same-project or adjacent-scope child with remaining context
-  through `send_message` and a delta brief;
-- spawn fresh for a different role or model, unrelated work, high context, fresh
-  isolation, or an independent final review;
-- use at most two follow-ups or roughly half a child's context by default;
-- treat `send_message` as acceptance only and wait for its completion notice;
-- a Reviewer that proposed a repair must not perform the fresh final acceptance
-  of that repair.
-
-If the control tools are unavailable, the PM falls back to spawning a new child
-with a complete brief. Every `subagent` call is asynchronous; start acceptance is
-never completion evidence.
-
-### Project status card
-
-The top-level PM can call `project_status_update` to append a compact,
-cross-turn project status event. The Web client renders it as a collapsible card
-docked above the composer:
-
-- collapsed view: goal or focus, summary, phase, `done/total` progress, running
-  child count, verification state, and update time;
-- expanded view: work packages with role/owner/evidence, verification, next step,
-  and blockers;
-- the first update should carry complete state; later updates may send only
-  changed fields, while a provided `workPackages` list replaces the previous list;
-- only the top-level Project Lead may update the card; child Agents receive an
-  error instead of modifying the parent's status;
-- the PM prompt uses this card for progress and keeps the final chat response as
-  a short delivery summary.
-
-The native Goal owns the objective and lifecycle, the native task card owns the
-current turn's executable steps, and this card owns cross-turn work packages,
-verification, blockers, and next actions. If the status tool is unavailable, the
-prompt falls back to a minimal status report.
-
-![Collapsed project status card](docs/status-card-collapsed.png)
-
-![Expanded project status card](docs/status-card-expanded.png)
-
-### Token accounting
-
-The plugin observes the global `llm/stream` waterfall, including child calls:
-
-- only streams with non-empty `provider` and `model` are recorded;
-- multiple usage chunks in one stream use the last chunk, and one usage-bearing
-  stream counts as one request;
-- the report includes input, output, cache read, cache write, reasoning, and
-  request counts;
-- `total = input + output + cache read + cache write`; reasoning is a subset of
-  output and is not added again;
-- rows are grouped by `provider/model` and sorted by computed total usage;
-- records cover all sessions and children since the plugin process started and
-  reset when the process restarts.
-
-Ask the main agent to call `model_token_usage` to view the report. It is separate
-from the Harness per-session token meter.
-
-## Model routing and authorization
-
-Child model selection requires two independent layers.
-
-### Layer 1: available model routes
-
-Configure OpenAI-compatible routes in the Web **Models** page or an `llm-pi-ai`
-row. A route declares its provider, model, API endpoint, and `apiKeyEnv`.
+Model selection has two independent layers. First, define OpenAI-compatible
+routes in the Web **Models** page or an `llm-pi-ai` row. A route declares a
+provider, model, endpoint, and `apiKeyEnv`; `apiKeyEnv` is a name, not a secret.
 
 ```yaml
 - id: llm-pi-ai
@@ -250,9 +187,7 @@ row. A route declares its provider, model, API endpoint, and `apiKeyEnv`.
             contextWindow: 200000
 ```
 
-### Layer 2: allow-list and tool scope
-
-The allow-list accepts exact provider/model pairs:
+Then authorize exact pairs and enable selection:
 
 ```yaml
 - id: subagent-model-selection-settings
@@ -261,11 +196,8 @@ The allow-list accepts exact provider/model pairs:
     allowedModels:
       - { provider: glm, model: glm-4.6 }
       - { provider: kimi, model: kimi-k2-0711-preview }
-```
 
-The live delegation tool must also be inside an agent-preset scope and set:
-
-```yaml
+# This row must be inside an agent-preset scope. Web presets already provide it.
 - id: tool-subagent
   config:
     provider: spawn
@@ -273,88 +205,132 @@ The live delegation tool must also be inside an agent-preset scope and set:
     modelSelectionSettings: true
 ```
 
-Both layers are required:
+Both layers are required. If the allow-list is disabled or empty, or the
+delegation row is outside a preset scope, `list_subagent_models` is not
+registered. The allow-list does not create providers or credentials; it only
+limits exact routes that an already configured provider may use. Without model
+selection, do not pass `provider`, `model`, or `reasoning_effort`.
 
-- if the allow-list is disabled or empty, or the tool is outside preset scope,
-  `list_subagent_models` is not registered;
-- without model selection, the child must not receive `provider`, `model`, or
-  `reasoning_effort`; it uses the configured default child route;
-- the allow-list controls which exact routes may be selected; it does not create
-  providers or replace API-key configuration;
-- `modelNotes` affects PM assignment advice only and never grants permission;
-- reasoning effort is shown and passed only when the model catalog advertises it.
+### Built-in child roles
 
-The shipped Web standard / ptc / cordis presets already provide the scoped
-delegation tool, so Web users normally only configure the allow-list. A host-level
-row in a direct-agent or headless composition cannot enable this model-selection
-feature.
+- **Executor:** implements, debugs, and verifies one bounded work package; it
+  does not redefine the goal or spawn another child.
+- **Reviewer:** performs an independent, read-only review and returns findings
+  and a verdict; it does not fix the delivery.
+- **Scout:** performs read-only reconnaissance of entry points, dependencies,
+  conventions, and tests; it reports facts without implementing or making
+  product decisions.
 
-## Child roles
+The bundled role files are `prompts/00-project-manager.md` through
+`prompts/08-scout.md`.
 
-The PM should start each child brief with a role marker:
+## Runtime behavior
+
+The plugin uses the public `systemPrompt`, `tools`, `sessionProjections`, and
+`llm/stream` extension points. It does not patch Harness internals.
+
+### Prompt assembly and dispatch
+
+For each prompt assembly, the plugin checks delegation depth, visible tools,
+the active preset, and configuration:
+
+1. A delegated child receives its role contract and never the PM contract.
+2. An agent without a visible `subagent` tool receives no orchestration prompt.
+3. `main: off` disables the orchestration section.
+4. A top-level session outside `pmPreset` receives `otherMain` and keeps its
+   preset's tools.
+5. A PM session receives `compact` or `full`; `full` adds intake, planning,
+   review, and status contracts.
+
+The PM prompt asks the agent to record work packages, discover authorized
+routes when `list_subagent_models` is visible, write complete briefs, launch
+independent packages together, and accept results only with evidence. When
+`list_agents` and `send_message` are available, an idle child with the same
+role and adjacent scope may receive a delta brief. A fresh child is used for a
+different role or model, unrelated work, large context, fresh isolation, or an
+independent final review. A follow-up is acceptance of a message, not
+completion; the PM still waits for the completion notice.
+
+### Project status card
+
+The top-level PM can call `project_status_update` at phase boundaries and after
+child completion. The Web client renders a collapsible card above the composer:
+
+- collapsed: goal/focus, summary, phase, `done/total`, active children,
+  verification, and update time;
+- expanded: work packages with role, owner, state, evidence, blockers, and next
+  step;
+- the first update should be complete; later updates may contain changed fields;
+  a supplied `workPackages` list replaces the previous list;
+- child agents cannot update the card; on completion use `phase: done` and clear
+  `next`.
+
+![Collapsed project status card](docs/status-card-collapsed.png)
+
+![Expanded project status card](docs/status-card-expanded.png)
+
+### Token accounting
+
+The plugin observes every global `llm/stream`, including child calls. Streams
+without both a non-empty provider and model are ignored. The last usage chunk
+in a stream is authoritative and contributes one request. Rows are grouped by
+`provider/model` and sorted by computed total. `total = input + output + cache
+read + cache write`; reasoning is a subset of output and is not added again.
+Data covers all sessions since the plugin process started and resets when the
+process restarts. Ask the top-level agent to call `model_token_usage`; this is
+separate from the Harness per-session token meter.
+
+## Repository layout
 
 ```text
-ROLE: executor
-ROLE: reviewer
-ROLE: scout
+lib/index.js       Runtime plugin, prompt gating, tools, and accounting
+lib/prompts.js      Prompt loading, role parsing, and rendering
+lib/client.js       Web Settings page and status-card client module
+prompts/            Bundled PM and child-role Markdown prompts
+examples/           Profile, PM preset, and legacy settings examples
+docs/               Status-card screenshots
+test/               Runtime and compatibility tests
+cordis.patch.yml    Mount-only bundle patch
 ```
 
-- **Executor:** implements, debugs, and verifies one bounded package without
-  redefining the goal or spawning another child.
-- **Reviewer:** performs a read-only, adversarial review and returns evidence-based
-  findings and a verdict; it does not fix the delivery.
-- **Scout:** performs read-only reconnaissance of code, dependencies, entry points,
-  and tests; it reports facts and evidence without implementing or making product
-  decisions.
+## Development and tests
 
-Children cannot see the main conversation, so each brief must include its goal,
-context, scope, non-goals, deliverable, acceptance conditions, and authorized
-verification commands.
-
-## Documentation and migration
-
-- [Profile patch example](examples/cordis.patch.yml)
-- [PM preset example](examples/pm-preset.patch.yml)
-- [Legacy 0.1.x settings format](examples/settings.yaml)
-- [中文 README](README.zh.md)
-
-### Migrating from 0.1.x
-
-DeepSeek Harness 0.2.x imports `$DSH_HOME/settings.yaml` once and then renames it
-to `settings.yaml.imported`; later edits are ignored. Move configuration to the
-profile patch or Settings page. Current row ids are `llm-pi-ai`,
-`subagent-model-selection-settings`, `tool-subagent`, and `project-lead`. The old
-`subagent-model-selection` id and the former foreground/background delegation
-switch are not part of the 0.2.x interface.
-
-## Troubleshooting
-
-- **`list_subagent_models` is missing:** check `enabled`, a non-empty
-  `allowedModels`, and `modelSelectionSettings: true` on the preset-scoped row.
-- **`standing modelSelectionSettings requires a scoped preset Context`:** move the
-  setting into an agent-preset scope, or use the configured child route.
-- **A child route is rejected:** verify the exact provider/model is in
-  `allowedModels`, the provider advertises the model, and the delegation depth
-  limit has not been reached.
-- **Only `started subagent ...` appears:** wait for the completion notice; start
-  acceptance is not success.
-- **`model_token_usage` has no records:** no usage-bearing model stream has
-  completed since the plugin loaded.
-- **Edits to `settings.yaml` do nothing:** 0.2.x imported it once and renamed it;
-  migrate the values to the profile patch.
-- **`modelNotes` has no effect:** check the `project-lead` row id, `config:`
-  indentation, and reload or restart.
-
-## Testing
+The package is ESM and publishes `lib/index.js` as its main entry. The repository
+defines this verification command:
 
 ```sh
 npm test
 ```
 
-The test script checks client JavaScript syntax, plugin configuration and preset
-gating, PM/child prompt selection, role-marker parsing, child-reuse guidance,
-status projection and permissions, token accounting, package compatibility, and
-the shipped examples.
+It checks client syntax, prompt selection and role parsing, preset/tool gating,
+status-card permissions and projection, token accounting, package compatibility,
+and the shipped examples.
+
+## Migration from 0.1.x
+
+DeepSeek Harness 0.2.x imports `$DSH_HOME/settings.yaml` once and then renames
+it to `settings.yaml.imported`; later edits are ignored. Move configuration to
+the profile patch or Web Settings page. Current row ids are `llm-pi-ai`,
+`subagent-model-selection-settings`, `tool-subagent`, and `project-lead`.
+The old `subagent-model-selection` id and the former foreground/background
+delegation switch are not part of the 0.2.x interface.
+
+## Troubleshooting
+
+- **`list_subagent_models` is missing:** check `enabled`, a non-empty
+  `allowedModels`, and `modelSelectionSettings: true` on the preset-scoped row.
+- **`standing modelSelectionSettings requires a scoped preset Context`:** move
+  the setting into an agent-preset scope or use the configured child route.
+- **A child route is rejected:** verify the exact provider/model is configured
+  and is also present in `allowedModels`.
+- **Only `started subagent ...` appears:** wait for the completion notice;
+  acknowledgement is not success evidence.
+- **`model_token_usage` is empty:** no usage-bearing model stream has completed
+  since the plugin loaded.
+- **Edits to `settings.yaml` do nothing:** migrate the values because 0.2.x
+  imports that file once and renames it.
+- **The status card is absent:** check that the Web client loads the packaged
+  client module and that the top-level agent can see `project_status_update`.
 
 ## License
 
