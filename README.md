@@ -259,7 +259,8 @@ child completion. The Web client renders a collapsible card above the composer:
 - collapsed: goal/focus, summary, phase, `done/total`, active children,
   verification, and update time;
 - expanded: work packages with role, owner, state, evidence, blockers, and next
-  step;
+  step; the expanded area scrolls inside a capped card, so the header and its
+  collapse control stay reachable even with many work packages;
 - the first update should be complete; later updates may contain changed fields;
   a supplied `workPackages` list replaces the previous list;
 - child agents cannot update the card; on completion use `phase: done` and clear

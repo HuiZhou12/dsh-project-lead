@@ -130,7 +130,7 @@ test("manifest remains a mount-only bundle with optional peers", () => {
 });
 
 test("no 0.1.x compatibility branch is advertised", () => {
-  assert.equal(manifest.version, "0.6.2");
+  assert.equal(manifest.version, "0.6.3");
   assert.doesNotMatch(
     JSON.stringify(manifest.peerDependencies),
     /0\.1\./

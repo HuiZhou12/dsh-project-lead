@@ -1,6 +1,6 @@
 {
   "name": "dsh-project-lead",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "A DeepSeek Harness 0.2.x plugin: a Project Lead / Project Manager main agent that delegates implementation to subagents, injects bundled PM/executor/reviewer/scout role prompts, reports per-model token usage, and ships a first-party Settings-page UI for prompt scope and subagent routing.",
   "type": "module",
   "main": "lib/index.js",
