@@ -148,14 +148,21 @@ profile patch 中配置 `project` 字段。
 - 委派工具把子 Agent 送入 `agentPreset: standard`；
 - Standard 仍是默认 preset，适合不需要拆分的小任务。
 
+另一个示例 [examples/pm-preset-ops.patch.yml](examples/pm-preset-ops.patch.yml)
+为 PM 保留平台对应的 shell，用于 worktree 管理。内置提示词把 shell 使用范围
+限定在 `git worktree` 命令，但 shell 理论上也能写文件，因此该变体中“PM 不写代码”
+降级为提示词规则；`write` / `edit` 工具仍然硬禁用。不需要 worktree 隔离时，
+优先使用更严格的第一个 preset。
+
 ### 并行工作包
 
 无论是否启用 preset，PM 提示词都带派发纪律：同一批最多并行 2 个实现包；写同一批
 文件或同一模块的包绝不并行；PM 不用 sleep/轮询等子 Agent；被 `question` 阻塞的包，
 其依赖包在答复清空前不派发。
 
-当 PM 还拥有 shell（preset 中保留 `pwsh` 或 `bash`）时，并行实现包会进一步用逐包
-git worktree 隔离：`git worktree add .worktrees/<包id> -b project-lead/<包id>`，
+当 PM 还拥有 shell（preset 中保留 `pwsh` 或 `bash`，见
+[ops preset 变体](examples/pm-preset-ops.patch.yml)）时，并行实现包会进一步用
+逐包 git worktree 隔离：`git worktree add .worktrees/<包id> -b project-lead/<包id>`，
 把 worktree 路径作为子 Agent 的 `cwd`，合并后 `git worktree remove`。没有 shell 时
 （例如上面的 preset），提示词自动省略 worktree 步骤，安全性由并行上限和
 “同批文件不并行”规则承担。

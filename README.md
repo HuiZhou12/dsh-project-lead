@@ -169,6 +169,13 @@ boundary:
 - the delegation tool sends children to `agentPreset: standard`;
 - Standard remains the default for small tasks that do not need decomposition.
 
+A second example, [examples/pm-preset-ops.patch.yml](examples/pm-preset-ops.patch.yml),
+keeps a platform-appropriate shell for worktree management. The bundled prompt
+narrows shell use to `git worktree` commands, but a shell can technically write
+files, so "the PM never writes code" becomes a prompt rule in this variant;
+`write` and `edit` tools stay hard-disabled. Prefer the stricter preset unless
+you want worktree isolation.
+
 ### Parallel work packages
 
 The PM prompt enforces dispatch discipline regardless of preset: at most two
@@ -177,7 +184,8 @@ module never run in parallel, the PM never sleeps or polls for child results,
 and packages that depend on a `question` blocked on the user are not dispatched
 until it is answered.
 
-When the PM also has a shell (`pwsh` or `bash` kept in the preset), parallel
+When the PM also has a shell (`pwsh` or `bash` kept in the preset — see the
+[ops preset variant](examples/pm-preset-ops.patch.yml)), parallel
 implementation packages are additionally isolated in per-package git worktrees:
 `git worktree add .worktrees/<id> -b project-lead/<id>` with the worktree path
 passed as the child's `cwd`, merged and then removed with

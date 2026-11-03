@@ -130,7 +130,7 @@ test("manifest remains a mount-only bundle with optional peers", () => {
 });
 
 test("no 0.1.x compatibility branch is advertised", () => {
-  assert.equal(manifest.version, "0.7.0");
+  assert.equal(manifest.version, "0.7.1");
   assert.doesNotMatch(
     JSON.stringify(manifest.peerDependencies),
     /0\.1\./
@@ -197,6 +197,21 @@ test("PM preset example keeps read and removes write/edit/shell", () => {
   assert.match(text, /agentPreset: standard/);
   assert.doesNotMatch(text, /tool-pwsh/);
   assert.doesNotMatch(text, /tool-bash/);
+  assert.doesNotMatch(text, /id: tool-fs-search/);
+});
+
+test("ops preset variant keeps write/edit off and adds a platform shell", () => {
+  const text = readFileSync(
+    new URL("../examples/pm-preset-ops.patch.yml", import.meta.url),
+    "utf8"
+  );
+  assert.match(text, /preset-pm-ops/);
+  assert.match(text, /write: false/);
+  assert.match(text, /edit: false/);
+  assert.match(text, /agentPreset: standard/);
+  assert.match(text, /tool-bash/);
+  assert.match(text, /tool-pwsh/);
+  assert.match(text, /process\.platform/);
   assert.doesNotMatch(text, /id: tool-fs-search/);
 });
 
