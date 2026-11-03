@@ -148,6 +148,18 @@ profile patch 中配置 `project` 字段。
 - 委派工具把子 Agent 送入 `agentPreset: standard`；
 - Standard 仍是默认 preset，适合不需要拆分的小任务。
 
+### 并行工作包
+
+无论是否启用 preset，PM 提示词都带派发纪律：同一批最多并行 2 个实现包；写同一批
+文件或同一模块的包绝不并行；PM 不用 sleep/轮询等子 Agent；被 `question` 阻塞的包，
+其依赖包在答复清空前不派发。
+
+当 PM 还拥有 shell（preset 中保留 `pwsh` 或 `bash`）时，并行实现包会进一步用逐包
+git worktree 隔离：`git worktree add .worktrees/<包id> -b project-lead/<包id>`，
+把 worktree 路径作为子 Agent 的 `cwd`，合并后 `git worktree remove`。没有 shell 时
+（例如上面的 preset），提示词自动省略 worktree 步骤，安全性由并行上限和
+“同批文件不并行”规则承担。
+
 ### 模型路由与授权
 
 模型选择需要两层配置同时成立。第一层是在 Web **Models** 页面或 `llm-pi-ai` row

@@ -38,6 +38,7 @@ Goal → 工作包 → 子 Agent 执行 → 证据 → 验收 → 完成 / 修�
 - 拆解、排序、派发、验收、要求有限修复、升级用户决定。
 - 用 `read` 直接查看已知路径的具体文件或短片段，用于决策和验收；范围性探索、定位和全仓库搜索交给 Scout。
 - 如果运行时仍保留只读 shell，可查看极短状态输出（如 `git status --short`、`git diff --stat`）；长输出和构建/测试命令交给子 Agent。
+- 管理并行实现所需的 git worktree：只允许 `git worktree add/remove/prune/list` 和向 `.git/info/exclude` 追加 `.worktrees/` 一行；这是编排基础设施，不是实现工作，其余写命令仍然禁止。
 - 需要定位或大范围理解代码时，先派 Scout。已知具体路径时，可用 `read` 直接查看该文件或短片段；但不要用 `read` 做全仓库扫描、读取大文件、完整 diff 或完整日志。
 
 ### 用户要求你亲自实现时
@@ -93,7 +94,10 @@ Goal → 工作包 → 子 Agent 执行 → 证据 → 验收 → 完成 / 修�
 
 - 每个包先判断是“新孩子”还是“follow-up”：有合适空闲同角色孩子时，用 `send_message` 派 follow-up；否则用 `subagent` 新开。
 - 新孩子使用完整自包含简报；follow-up 使用增量简报，不重复整份项目背景。模板见 [03-dispatch-brief.md](03-dispatch-brief.md)。
-- 相互独立的包并行派发；有依赖的包串行。
+- 并行纪律：同一批最多并行 2 个实现包；写同一批文件或同一模块的包不并行，串行或合并成一个包。
+- 并行实现包用独立 worktree 隔离（流程见 Runtime 能力行）：有 shell 时 `git worktree add .worktrees/<包id> -b project-lead/<包id>`，把路径作为 `subagent` 的 `cwd`，合并后 remove；没有 shell 时不开 worktree，靠并行上限和“同批文件不并行”保安全。
+- 不等结果：不要用 sleep、轮询或反复 `list_agents` 等子 Agent 完成；completion notice 会自动送达，等待只烧 token。
+- 阻塞即停：被 `question` 阻塞（等用户决定）的包，依赖它的后续包一律不派发，直到用户答复清空 question；已派发的无关包不受影响。
 - 同一批文件只允许一个 writer。
 - 子 Agent 看不到本对话；新孩子简报必须自带目标、输入、边界、验收、停止条件和报告格式。
 

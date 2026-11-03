@@ -129,6 +129,8 @@ child prompts.
       protectedCapabilities: [billing]
       conventions: [keep changes small]
       humanValidation: [verify the Web status card]
+      deliveryRequirements:
+        - each work package diff stays under 300 lines
       notes: Additional project context for the PM.
     subagent:
       provider: glm
@@ -151,6 +153,7 @@ child prompts.
 | `prompts.roleMarker` | `ROLE` | Prefix parsed from a line such as `ROLE: scout`. |
 | `prompts.dir` | bundled | Custom directory using `00-project-manager.md` through `08-scout.md`; missing files fall back to bundled prompts. |
 | `project.*` | empty | Optional project facts. An empty `project.root` uses the session working directory. |
+| `project.deliveryRequirements` | `[]` | Per-project delivery gates rendered into the PM and child prompts, e.g. a diff-size cap or a review requirement. |
 | `subagent.provider/model` | empty | Default route passed by the PM. Empty values leave route selection to the authorized session. |
 | `subagent.reasoningEffort` | empty | Passed only when the selected model advertises that effort. |
 | `modelNotes` | `{}` | Per-route dispatch advice; it is not an authorization list. |
@@ -165,6 +168,22 @@ boundary:
 - the PM omits `write`, `edit`, `pwsh`, and `bash`;
 - the delegation tool sends children to `agentPreset: standard`;
 - Standard remains the default for small tasks that do not need decomposition.
+
+### Parallel work packages
+
+The PM prompt enforces dispatch discipline regardless of preset: at most two
+implementation packages run in parallel, packages that write the same files or
+module never run in parallel, the PM never sleeps or polls for child results,
+and packages that depend on a `question` blocked on the user are not dispatched
+until it is answered.
+
+When the PM also has a shell (`pwsh` or `bash` kept in the preset), parallel
+implementation packages are additionally isolated in per-package git worktrees:
+`git worktree add .worktrees/<id> -b project-lead/<id>` with the worktree path
+passed as the child's `cwd`, merged and then removed with
+`git worktree remove`. Without a shell — for example under the preset above —
+the worktree step is omitted from the prompt and safety relies on the
+concurrency cap and the same-files rule.
 
 ### Model routes and authorization
 

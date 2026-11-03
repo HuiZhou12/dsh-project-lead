@@ -160,6 +160,50 @@ test("role list is stable", () => {
   assert.deepEqual(CHILD_ROLES, ["executor", "reviewer", "scout"]);
 });
 
+test("bundled prompts keep their required rule contracts", () => {
+  const assets = loadPromptAssets();
+  // Each entry is a rule that must never silently drift out of the bundled
+  // text; removing or rewording one should fail this test on purpose.
+  const contracts = [
+    {
+      name: "manager",
+      rules: [
+        /不写、不改任何实现代码/,
+        /不把子 Agent 的/,
+        /当前 turn/,
+        /project_status_update/,
+        /question/,
+        /批最多并行 2 个/,
+        /不要用 sleep、轮询/,
+        /worktree/,
+        /send_message/,
+        /同一批文件只允许一个 writer/
+      ]
+    },
+    {
+      name: "status",
+      rules: [/question/, /phase: "done"/, /状态节奏/]
+    },
+    {
+      name: "executor",
+      rules: [/不派发子 Agent/, /files_changed/, /两轮/]
+    },
+    {
+      name: "reviewer",
+      rules: [/finding/, /fresh reviewer/, /blocker/]
+    },
+    {
+      name: "scout",
+      rules: [/事实/, /path:line/]
+    }
+  ];
+  for (const { name, rules } of contracts) {
+    for (const rule of rules) {
+      assert.match(assets[name], rule, `${name} prompt must keep the rule ${rule}`);
+    }
+  }
+});
+
 test("prompt sizes stay within the model-surface budget", () => {
   const assets = loadPromptAssets();
   const project = {
@@ -172,15 +216,23 @@ test("prompt sizes stay within the model-surface budget", () => {
     protectedCapabilities: ["billing"],
     conventions: ["small diffs"],
     humanValidation: ["verify the Web status card"],
+    deliveryRequirements: ["每包 diff 不超过 300 行", "高风险包必须独立 reviewer"],
     notes: "Additional project context."
   };
-  const runtime = { todo: true, usage: true, modelSelection: true, childControl: true, statusCard: true };
+  const runtime = { todo: true, usage: true, modelSelection: true, childControl: true, statusCard: true, shell: true };
 
   // Budgets guard against prompt creep: every bundled section, capability
   // line, and future addition must still fit what the model reads per role.
-  // Measured 2026-11: compact PM 7.5k, full PM 18.9k, children 2.3-2.9k chars.
+  // Measured 2026-11: compact PM 8.4k, full PM 19.8k, children 2.3-2.9k chars.
   const pmCompact = renderMainPrompt(assets, { mode: "compact", project, runtime, modelSelection: true });
   assert.ok(pmCompact.length <= 9000, `compact PM prompt is ${pmCompact.length} chars; budget 9000`);
+  assert.match(pmCompact, /交付要求/);
+  // The worktree procedure is capability-gated: the operational detail only
+  // rides along when the PM actually has a shell; the bundled text itself
+  // carries the branch wording for both cases.
+  assert.match(pmCompact, /git worktree remove \.worktrees/);
+  const pmCompactNoShell = renderMainPrompt(assets, { mode: "compact", project, runtime: { ...runtime, shell: false }, modelSelection: true });
+  assert.doesNotMatch(pmCompactNoShell, /git worktree remove \.worktrees/);
   const pmFull = renderMainPrompt(assets, { mode: "full", project, runtime, modelSelection: true });
   assert.ok(pmFull.length <= 22000, `full PM prompt is ${pmFull.length} chars; budget 22000`);
   for (const role of CHILD_ROLES) {
