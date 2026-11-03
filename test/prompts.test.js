@@ -159,3 +159,32 @@ test("custom role marker is honored", () => {
 test("role list is stable", () => {
   assert.deepEqual(CHILD_ROLES, ["executor", "reviewer", "scout"]);
 });
+
+test("prompt sizes stay within the model-surface budget", () => {
+  const assets = loadPromptAssets();
+  const project = {
+    name: "demo",
+    root: "/repo",
+    stack: "Node",
+    verifyCommands: ["npm test"],
+    allowedPaths: ["src/**"],
+    forbiddenPaths: [".env"],
+    protectedCapabilities: ["billing"],
+    conventions: ["small diffs"],
+    humanValidation: ["verify the Web status card"],
+    notes: "Additional project context."
+  };
+  const runtime = { todo: true, usage: true, modelSelection: true, childControl: true, statusCard: true };
+
+  // Budgets guard against prompt creep: every bundled section, capability
+  // line, and future addition must still fit what the model reads per role.
+  // Measured 2026-11: compact PM 7.5k, full PM 18.9k, children 2.3-2.9k chars.
+  const pmCompact = renderMainPrompt(assets, { mode: "compact", project, runtime, modelSelection: true });
+  assert.ok(pmCompact.length <= 9000, `compact PM prompt is ${pmCompact.length} chars; budget 9000`);
+  const pmFull = renderMainPrompt(assets, { mode: "full", project, runtime, modelSelection: true });
+  assert.ok(pmFull.length <= 22000, `full PM prompt is ${pmFull.length} chars; budget 22000`);
+  for (const role of CHILD_ROLES) {
+    const prompt = renderChildPrompt(assets, { role, project });
+    assert.ok(prompt.length <= 3500, `${role} prompt is ${prompt.length} chars; budget 3500`);
+  }
+});

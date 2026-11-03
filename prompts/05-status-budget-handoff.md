@@ -27,7 +27,8 @@ project_status_update({
   activeAgents: 2,
   verification: "未运行 | 通过 | 失败：<摘要>",
   next: "下一步",
-  blockers: "当前阻塞；无则空字符串"
+  blockers: "当前阻塞；无则空字符串",
+  question: "等用户决定时才填：一个具体问题；无则空字符串"
 })
 ```
 
@@ -35,6 +36,7 @@ project_status_update({
 - 阶段变化或子 Agent 完成时更新一次；不要每收到一条消息就重写整张卡。
 - 工作包列表变化时传 `workPackages`；未变化可省略。
 - 有原生 Goal 时不要重复传同一句 `goal`；`goal` 只作为没有原生 Goal 时的回退标题。
+- 需要用户决定才能继续时：`phase: "blocked"` 并在 `question` 写一个具体问题（含可选项或影响，一次只问一个），然后停下等答复；不要在聊天里复述这个问题。用户答复后把 `question` 清空再继续。
 - 详细证据、完整日志、完整 diff 留在工作区或子 Agent 报告，不粘回主上下文。
 - 完成后传 `phase: "done"` 并把 `next` 留空；UI 会把完成态压缩成一行，不需要再反复更新。
 - 只有最终交付、blocker、需要用户决定时才发普通助手消息；最终总结保持简短。
@@ -48,7 +50,8 @@ project_status_update({
 3. 每个并行批次完成；
 4. Review 结论；
 5. 任何阻塞、范围变化或停止；
-6. 最终 handoff。
+6. 设置 `question` 等用户决定，以及用户答复后清空它；
+7. 最终 handoff。
 
 不要用“再写一段状态”代替工具更新；状态卡的详情由 UI 展示。
 

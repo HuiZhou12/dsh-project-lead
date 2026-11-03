@@ -131,7 +131,7 @@ test("registers the prompt section, status projection, and tools without a setti
 
   assert.equal(ctx.projections.length, 1);
   assert.equal(ctx.projections[0].key, "projectLeadStatus");
-  assert.equal(ctx.projections[0].stateVersion, 2);
+  assert.equal(ctx.projections[0].stateVersion, 3);
   assert.equal(ctx.projections[0].init(), null);
 
   assert.equal(ctx.registered.length, 2);
@@ -162,6 +162,7 @@ test("project_status_update persists status in tool-result meta, not a custom ev
     activeAgents: 2,
     verification: "Not run",
     next: "Review the dock",
+    question: "Merge now or after the second batch?",
     workPackages: [
       { id: "wp-1", title: "Build card", role: "executor", owner: "child-1", state: "done", evidence: "tests pass" },
       { id: "wp-2", title: "Review card", role: "reviewer", state: "pending" }
@@ -183,6 +184,7 @@ test("project_status_update persists status in tool-result meta, not a custom ev
   assert.equal(projected.goal, "Ship the status card");
   assert.equal(projected.phase, "executing");
   assert.equal(projected.done, 1);
+  assert.equal(projected.question, "Merge now or after the second batch?");
   assert.equal(projected.workPackages.length, 2);
   assert.equal(projected.workPackages[1].state, "pending");
   assert.equal(projected.updatedAt, 12345);
@@ -195,8 +197,22 @@ test("project_status_update persists status in tool-result meta, not a custom ev
   assert.equal(partial.phase, "reviewing");
   assert.equal(partial.goal, "Ship the status card");
   assert.equal(partial.done, 1);
+  assert.equal(partial.question, "Merge now or after the second batch?");
   assert.equal(partial.workPackages.length, 2);
   assert.equal(partial.updatedAt, 13000);
+
+  // The user answered: an explicit empty string clears the question; fields
+  // the update omits still carry over.
+  const answered = ctx.projections[0].apply(partial, {
+    type: "tool/result",
+    time: 14000,
+    data: { meta: { projectLeadStatus: { status: { phase: "executing", question: "" } } } }
+  });
+  assert.equal(answered.phase, "executing");
+  assert.equal(answered.question, "");
+  assert.equal(answered.goal, "Ship the status card");
+  assert.equal(answered.workPackages.length, 2);
+  assert.equal(answered.updatedAt, 14000);
 });
 
 test("the projection still folds legacy and migrated status records", () => {
