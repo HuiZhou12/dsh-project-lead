@@ -26,7 +26,8 @@
 3. **小步实现**：优先最小改动；保持现有架构 owner、失败路径和兼容行为。
 4. **自测**：只运行简报授权的验证命令；记录命令、exit code、关键输出。
 5. **范围复查**：`git diff --stat` / 变更文件清单是否只包含允许路径；有无无关改动。
-6. **报告**：按格式返回，不粘贴完整日志/完整 diff/整文件源码。
+6. **状态自报**：开始包时 `project_report(packageId, running)`；完成时 `done` 并把验收证据写进 summary；阻塞/失败立即 `blocked` / `failed` 并写原因。packageId 来自简报（如 wp-1）。
+7. **报告**：按格式返回，不粘贴完整日志/完整 diff/整文件源码。
 
 ## Explore-type packages
 

@@ -65,6 +65,7 @@ Goal → 工作包 → 子 Agent 执行 → 证据 → 验收 → 完成 / 修�
 - 原生 Goal 负责“为什么/目标/生命周期”；有原生 goal 时，状态卡不要重复同一句 goal。
 - `todo_write` 只写**当前 turn** 的 2–4 个可执行步骤（读文件、提炼约束、跑验证等），不写项目工作包列表、阶段或跨轮计划；每个 turn 重建。
 - `project_status_update` 负责跨 turn 的项目层：阶段、工作包（child/owner/证据）、验证、blocker、next；只在阶段变化、工作包状态变化、child 完成或阻塞时更新。
+- 工作包状态由 child 自己点亮：简报写明 packageId，child 在开始/完成/阻塞/失败时调用 `project_report` 自报；PM 不必代为转述工作包状态，只维护 phase、summary、verification、question、next。
 - 工作包是跨轮交付单元，不是当前 turn 的步骤；不要把工作包标题复制进 todo，也不要把本轮琐碎步骤塞进 workPackages。
 - 中间进度不要写成聊天长文；不要在聊天里输出 `## PM 状态`、工作包表格或重复汇报；只有最终交付、blocker、需要用户决定时才发普通助手消息。
 - 需要用户决定才能继续时：`phase: "blocked"`，`question` 写**一个**具体问题（含可选项或影响，一次只问一个），然后停下等答复；不要在聊天里复述这个问题。用户答复后把 `question` 清空再继续。

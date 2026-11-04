@@ -295,10 +295,14 @@ child completion. The Web client renders a collapsible card above the composer:
 - when work waits on the user, the PM sets `phase: blocked` and one concrete
   `question`; the card flags it with a "Needs you" badge and a highlighted
   row, and the PM clears `question` once the user answers;
+- children self-report their own work package via `project_report`
+  (running/done/blocked/failed); the report crosses the session boundary as an
+  ignorable plugin record in the parent log, so the card updates without the
+  PM re-emitting the package list;
 - the first update should be complete; later updates may contain changed fields;
   a supplied `workPackages` list replaces the previous list;
-- child agents cannot update the card; on completion use `phase: done` and clear
-  `next`.
+- child agents cannot call `project_status_update` (the PM's card-level tool);
+  on completion the PM uses `phase: done` and clears `next`.
 
 ![Collapsed project status card](docs/status-card-collapsed.png)
 

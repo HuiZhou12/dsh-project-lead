@@ -254,8 +254,11 @@ PM 提示要求 Agent 记录工作包，在可见 `list_subagent_models` 时先�
   独立滚动，工作包再多也能看到顶部的收起按钮；
 - 工作需要用户决定时，PM 设置 `phase: blocked` 和一个具体的 `question`；状态卡用
   "需答复"徽标和高亮行标记，用户答复后 PM 清空 `question`；
+- 子 Agent 通过 `project_report` 自报自己的工作包状态（running/done/blocked/failed）；
+  报告以可忽略 plugin record 写入父会话日志，状态卡无需 PM 转述即可更新；
 - 第一次更新应提供完整状态，后续可以只传变化字段；提供 `workPackages` 时会替换旧列表；
-- 子 Agent 更新状态卡会被拒绝；完成时设置 `phase: done` 并清空 `next`。
+- 子 Agent 不能调用 `project_status_update`（PM 的卡片级工具）；完成时由 PM 设置
+  `phase: done` 并清空 `next`。
 
 ![折叠的项目状态卡片](docs/status-card-collapsed.png)
 

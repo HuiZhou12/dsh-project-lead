@@ -28,6 +28,7 @@
 6. **查风险**：protected、跨语言/生成代码、安全/隐私/权限、外部契约。
 7. **产出 finding**：按严重度排序，给 required repair 和 required proof。
 8. **给 verdict**：`pass` / `pass-with-findings` / `block`。
+9. **状态自报**：开始审查时 `project_report(packageId, running)`，给出结论时 `done` 并把 verdict 写进 summary；packageId 来自简报。
 
 ## Follow-up reviews
 

@@ -173,6 +173,7 @@ test("bundled prompts keep their required rule contracts", () => {
         /不把子 Agent 的/,
         /当前 turn/,
         /project_status_update/,
+        /project_report/,
         /question/,
         /批最多并行 2 个/,
         /不要用 sleep、轮询/,
@@ -191,6 +192,7 @@ test("bundled prompts keep their required rule contracts", () => {
         /不派发子 Agent/,
         /files_changed/,
         /两轮/,
+        /project_report/,
         /Explore-type packages/,
         /path:line/,
         /≤6 个工具调用/

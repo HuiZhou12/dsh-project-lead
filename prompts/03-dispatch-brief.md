@@ -186,6 +186,7 @@ send_message({
 
 - 第一行仍是 `ROLE: executor`；在简报里注明“探索型工作包，只读，不修改文件”。
 - 列出要回答的问题（3–5 个），一次简报只回答明确问出的问题；无关联的第二个问题另开简报。
+- 写明 packageId（如 wp-1），并要求 child 在开始/完成/阻塞时调用 `project_report` 自报状态。
 - 简报 ≤800 字符：一行显式问题 + 定位所需的最小上下文；项目背景只用于定位，不是要执行或核验的任务。
 - 要求 `事实 / 推断 / 未知` 三分，事实带 `path:line`；拿到答案即停，不做验证轮。
 - 不要求实现建议，除非明确询问。
@@ -195,6 +196,7 @@ send_message({
 
 - 明确允许修改的路径和禁止事项。
 - 明确验证命令和报告格式。
+- 写明 packageId（如 wp-1），并要求 child 在开始/完成/阻塞/失败时调用 `project_report` 自报状态。
 - 要求最小改动，不做无关重构。
 - 失败时报告失败，不“顺手修别的”。
 
@@ -202,6 +204,7 @@ send_message({
 
 - 绑定不可变 subject（commit / diff / artifact digest）。
 - 只读，不修复。
+- 写明 packageId，并要求在开始审查和给出结论时调用 `project_report` 自报。
 - 要求 finding：severity、invariant、evidence、required repair、required proof。
 - 明确审查重点：正确性、失败路径、兼容、安全、测试充分性、生成物、protected。
 

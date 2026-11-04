@@ -131,14 +131,15 @@ test("registers the prompt section, status projection, and tools without a setti
 
   assert.equal(ctx.projections.length, 1);
   assert.equal(ctx.projections[0].key, "projectLeadStatus");
-  assert.equal(ctx.projections[0].stateVersion, 3);
+  assert.equal(ctx.projections[0].stateVersion, 4);
   assert.equal(ctx.projections[0].init(), null);
 
-  assert.equal(ctx.registered.length, 2);
+  assert.equal(ctx.registered.length, 3);
   const usage = getTool(ctx, "model_token_usage");
   assert.match(usage.description, /process-wide/);
   assert.match(usage.description, /not the built-in per-session token meter/);
   assert.ok(getTool(ctx, "project_status_update"));
+  assert.ok(getTool(ctx, "project_report"));
 });
 
 test("project_status_update persists status in tool-result meta, not a custom event", async () => {
@@ -248,6 +249,81 @@ test("child agents cannot update the top-level project status", async () => {
   const tool = getTool(ctx, "project_status_update");
   const child = { options: { subagentDepth: 1 }, session: { append() {} } };
   await assert.rejects(() => tool.execute({ phase: "executing" }, { agent: child }), /top-level Project Lead/);
+});
+
+test("project_report is child-only and validates its arguments", async () => {
+  const ctx = setup();
+  const tool = getTool(ctx, "project_report");
+  const top = { options: {}, session: { append() {} } };
+  await assert.rejects(
+    () => tool.execute({ packageId: "wp-1", state: "running" }, { agent: top }),
+    /project_status_update/
+  );
+  const child = { id: "child-1", options: { subagentDepth: 1 }, session: { header: {} } };
+  await assert.rejects(() => tool.execute({ state: "running" }, { agent: child }), /packageId/);
+  await assert.rejects(
+    () => tool.execute({ packageId: "wp-1", state: "pending" }, { agent: child }),
+    /state/i
+  );
+});
+
+test("project_report degrades to the final answer without a live parent", async () => {
+  const ctx = setup();
+  const tool = getTool(ctx, "project_report");
+  const child = { id: "child-1", options: { subagentDepth: 1 }, session: { header: {} } };
+  const result = await tool.execute(
+    { packageId: "wp-1", state: "running", summary: "locating entry points" },
+    { agent: child }
+  );
+  assert.match(result, /Report prepared/);
+  assert.match(result, /final answer/);
+});
+
+test("the projection folds child package reports", () => {
+  const ctx = setup();
+  let state = ctx.projections[0].apply(null, {
+    type: "tool/result",
+    time: 100,
+    data: {
+      meta: {
+        projectLeadStatus: {
+          status: {
+            phase: "executing",
+            done: 0,
+            total: 2,
+            workPackages: [
+              { id: "wp-1", title: "A", state: "pending" },
+              { id: "wp-2", title: "B", state: "pending" }
+            ]
+          }
+        }
+      }
+    }
+  });
+  state = ctx.projections[0].apply(state, {
+    type: "plugin:project-lead/report",
+    time: 200,
+    data: { report: { packageId: "wp-1", state: "running", summary: "located half the entry points" } }
+  });
+  assert.equal(state.workPackages[0].state, "running");
+  assert.equal(state.workPackages[0].evidence, "located half the entry points");
+  assert.equal(state.updatedAt, 200);
+  assert.equal(state.done, 0);
+
+  state = ctx.projections[0].apply(state, {
+    type: "plugin:project-lead/report",
+    time: 300,
+    data: { report: { packageId: "wp-1", state: "done", summary: "tests pass" } }
+  });
+  assert.equal(state.workPackages[0].state, "done");
+  assert.equal(state.workPackages[0].evidence, "tests pass");
+
+  const unchanged = ctx.projections[0].apply(state, {
+    type: "plugin:project-lead/report",
+    time: 400,
+    data: { report: { packageId: "wp-x", state: "done" } }
+  });
+  assert.equal(unchanged, state);
 });
 
 test("compact PM prompt includes the configured project profile and role convention", () => {
