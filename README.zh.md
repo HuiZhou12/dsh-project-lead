@@ -4,8 +4,12 @@
 
 `dsh-project-lead` 是一个面向 DeepSeek Harness 0.2.x 的项目编排插件。它让
 顶层 Agent 负责规划目标、拆分工作、派发自包含的工作包、根据证据验收子 Agent，
-并汇报结果。子 Agent 会获得三种聚焦角色之一：`executor`、`reviewer` 或
-`scout`。
+并汇报结果。子 Agent 会获得两种聚焦角色之一：`executor`（实现或探索）和
+`reviewer`。
+
+探索遵循 superagent 对齐：没有独立的 scout 角色——谁需要答案谁自己查。未知路径的
+定位通过探索型 executor 工作包完成（只读，交付物是调查报告），历史简报中的
+`ROLE: scout` 标记会自动按 executor 处理。
 
 插件还提供 Web 设置页、可选的只读 Project Manager preset、可折叠项目状态卡片，
 以及按 `provider/model` 分组的进程级 token 统计。
@@ -16,7 +20,7 @@ English documentation: [README.md](README.md)
 
 - **按作用域注入编排提示**：`compact` 和 `full` PM 提示只作用于配置的 PM
   preset；其他顶层会话可以保留原有工具，使用轻量 guidance 或关闭编排提示。
-- **子 Agent 角色契约**：`ROLE: executor`、`ROLE: reviewer` 或 `ROLE: scout`
+- **子 Agent 角色契约**：`ROLE: executor` 或 `ROLE: reviewer`
   选择对应契约。子 Agent 不会获得 PM 契约，也不会继续派生子 Agent。
 - **清晰的工具边界**：可选 PM preset 保留 `read` / `read_image`，移除
   `write`、`edit` 和 shell 工具，并把子 Agent 送入 `standard` 等代码能力完整的
@@ -72,7 +76,6 @@ dsh plugin --profile web add link:/absolute/path/to/dsh-project-lead
    ```text
    ROLE: executor
    ROLE: reviewer
-   ROLE: scout
    ```
 
    没有有效标记时使用 `prompts.defaultChildRole`，默认是 `executor`。子 Agent 看不到
@@ -129,10 +132,10 @@ profile patch 中配置 `project` 字段。
 | `prompts.main` | `compact` | `compact`、`full`、旧版 `guidance` 或 `off`；`compact` / `full` 只在 `pmPreset` 中使用 PM 契约。 |
 | `prompts.pmPreset` | `pm` | 接收 PM 契约的 preset id；留空表示所有顶层会话。 |
 | `prompts.otherMain` | `guidance` | 其他顶层 preset 使用轻量 guidance 或 `off`。 |
-| `prompts.childRoles` | `true` | 是否给子 Agent 注入 executor/reviewer/scout 契约。 |
+| `prompts.childRoles` | `true` | 是否给子 Agent 注入 executor/reviewer 契约。 |
 | `prompts.defaultChildRole` | `executor` | 没有有效角色标记时使用的角色。 |
-| `prompts.roleMarker` | `ROLE` | 读取如 `ROLE: scout` 这一行时使用的前缀。 |
-| `prompts.dir` | 内置 | 自定义 `00-project-manager.md` 到 `08-scout.md` 的目录；缺失文件回退到内置提示词。 |
+| `prompts.roleMarker` | `ROLE` | 读取如 `ROLE: executor` 这一行时使用的前缀。 |
+| `prompts.dir` | 内置 | 自定义 `00-project-manager.md` 到 `07-reviewer.md` 的目录；缺失文件回退到内置提示词。 |
 | `project.*` | 空 | 附加到提示词中的项目事实；`project.root` 为空时使用会话工作目录。 |
 | `subagent.provider/model` | 空 | PM 传给子 Agent 的默认路由；为空时由已授权会话决定。 |
 | `subagent.reasoningEffort` | 空 | 仅在目标模型声明支持该 effort 时传递。 |
@@ -214,10 +217,11 @@ profile patch 中配置 `project` 字段。
 ### 内置子 Agent 角色
 
 - **Executor**：在限定工作包内实现、调试和验证；不重新定义目标，也不继续派生子 Agent。
+  探索型 executor 工作包是只读调查，交付物是调查报告（事实带 `path:line`，简单定位
+  ≤6 个工具调用即停）；它取代了原先的 scout 角色。
 - **Reviewer**：独立、只读地审查交付，返回带证据的 finding 和 verdict；不负责修复交付物。
-- **Scout**：只读侦察入口、依赖、约定和测试，报告事实，不实现功能，也不替 PM 做产品决策。
 
-内置角色文件位于 `prompts/00-project-manager.md` 到 `prompts/08-scout.md`。
+内置角色文件位于 `prompts/00-project-manager.md` 到 `prompts/07-reviewer.md`。
 
 ## 运行机制
 

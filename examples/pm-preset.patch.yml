@@ -13,7 +13,8 @@
 # Then pick the preset in the new-session picker or Settings → Agent Presets.
 #
 # Adjust `agentOptions` to your cheap child route. Add `tool-fs-search` below
-# only if you want the PM itself to glob/grep; otherwise it asks a Scout.
+# only if you want the PM itself to glob/grep; otherwise it dispatches an
+# explore-type work package.
 
 - insert:
     - id: preset-pm

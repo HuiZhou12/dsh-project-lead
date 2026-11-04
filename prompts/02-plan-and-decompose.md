@@ -6,7 +6,7 @@
 
 - 已确认的 Goal Contract；
 - Spec / Grill 结论（如有）；
-- Scout 提供的仓库事实；
+- 探索型工作包产出的仓库事实（或已知路径的直接 `read`）；
 - 用户约束、授权和预算。
 
 ## 工作包契约
@@ -16,13 +16,14 @@
 ```yaml
 work_package:
   id: wp-1
-  role: scout | executor | reviewer
+  role: executor | reviewer
+  kind: implement | explore | review
   outcome: <一个可观察交付>
   scope: <要做什么>
   non_goals: <明确不做什么>
   inputs:
     - <文件/目录/事实/前置包>
-  allowed_paths: <允许写入的路径；scout/reviewer 为空>
+  allowed_paths: <允许写入的路径；explore/reviewer 为空>
   forbidden: <禁止事项>
   deliverable: <产出形式>
   acceptance: <客观验收条件>
@@ -41,19 +42,19 @@ work_package:
 
 1. **一个包一个 owner**：同一批文件只能有一个 writer。
 2. **一个包一个结果**：不要把研究、实现、审查塞进同一个包。
-3. **先研究后实现**：需要读代码才能决定的事，先派 Scout；不要让 Executor 边猜边改。
+3. **先研究后实现**：需要读代码才能决定的事，先派探索型工作包（executor，只读，交付调查报告）；不要让实现包边猜边改。
 4. **可并行优先**：互不依赖、写入路径不重叠的包并行；有依赖的包串行。
 5. **高风险隔离**：protected、跨语言生成代码、迁移、安全、权限、外部契约单独成包，并配独立 Reviewer。
 6. **最小充分**：3–7 个包为宜；超过 10 个先分组/分阶段，避免调度爆炸。
 7. **不重复**：同一工作不派两个包；需要竞争方案时明确“只读研究，不落地”。
 8. **可停止**：每个包都必须有停止条件和报告格式。
 
-## 角色选择
+## 角色与类型
 
-| 角色 | 用途 | 不该用于 |
+| 角色 / 类型 | 用途 | 不该用于 |
 |---|---|---|
-| Scout | 读代码、查路径、找 owner、确认现有行为、定位测试 | 修改、实现、审查自己的结论 |
-| Executor | 在明确边界内实现、调试、运行授权验证 | 研究开放式问题、给自己的高风险工作盖章 |
+| Executor · explore | 只读调查：读代码、查路径、找 owner、确认现有行为、定位测试，交付调查报告 | 修改文件、实现、替 PM 做产品决定 |
+| Executor · implement | 在明确边界内实现、调试、运行授权验证 | 开放式研究（改派 explore 包）、给自己的高风险工作盖章 |
 | Reviewer | 只读、独立审查、产出 finding | 修复、扩大范围、代替 PM 验收 |
 
 ## 子 Agent 池
@@ -80,7 +81,7 @@ work_package:
 先画依赖顺序，再分批：
 
 ```text
-Batch 1（可并行）：scout-repo, scout-tests
+Batch 1（可并行）：explore-repo, explore-tests（均为 executor 探索包）
 Batch 2（依赖 Batch 1）：executor-core
 Batch 3（依赖 Batch 2）：reviewer-core, executor-docs
 Batch 4：PM 集成与验收
@@ -115,8 +116,8 @@ Batch 4：PM 集成与验收
 
 | ID | 角色 | Child | 交付 | 依赖 | 模型档 | 预算 | 验收 |
 |---|---|---|---|---|---|---|---|
-| wp-1 | scout | reuse:abc / new | ... | - | cheap | ... | ... |
-| wp-2 | executor | reuse:def / new | ... | wp-1 | strong | ... | ... |
+| wp-1 | executor·explore | reuse:abc / new | ... | - | cheap | ... | ... |
+| wp-2 | executor·implement | reuse:def / new | ... | wp-1 | strong | ... | ... |
 
 **执行顺序**：
 **并行批次**：

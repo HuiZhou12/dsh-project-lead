@@ -27,9 +27,8 @@ test("bundled prompts load and are adapted for runtime", () => {
   assert.match(assets.manager, /Project Manager/);
   assert.match(assets.executor, /Executor/);
   assert.match(assets.reviewer, /Reviewer/);
-  assert.match(assets.scout, /Scout/);
   assert.ok(assets.dispatch.includes("ROLE: {{ROLE}}"));
-  for (const key of ["manager", "executor", "reviewer", "scout"]) {
+  for (const key of ["manager", "executor", "reviewer"]) {
     assert.doesNotMatch(assets[key], /\]\(\.\.\//, `${key} keeps a relative docs link`);
   }
 });
@@ -103,17 +102,19 @@ test("child prompt selects the role contract", () => {
   assert.match(reviewer, /# Reviewer/);
   assert.match(reviewer, /finding/);
 
-  const scout = renderChildPrompt(assets, { role: "scout", project });
-  assert.match(scout, /# Scout/);
-  assert.match(scout, /事实/);
+  // The scout role was removed (superagent alignment): unknown or legacy
+  // markers degrade to the executor contract, which now owns exploration.
+  const legacyScout = renderChildPrompt(assets, { role: "scout", project });
+  assert.match(legacyScout, /# Executor/);
+  assert.match(legacyScout, /Explore-type packages/);
 });
 
 test("readChildRole reads the first user message and falls back", () => {
   assert.equal(readChildRole(childWith("ROLE: reviewer\n\nReview this.")), "reviewer");
-  assert.equal(readChildRole(childWith("role: scout\n\nFind it.")), "scout");
+  assert.equal(readChildRole(childWith("role: scout\n\nFind it.")), "executor");
   assert.equal(readChildRole(childWith("ROLE: executor\n\nDo it.")), "executor");
   assert.equal(readChildRole(childWith("no marker here")), "executor");
-  assert.equal(readChildRole(childWith("ROLE: reviewer"), { defaultRole: "scout" }), "reviewer");
+  assert.equal(readChildRole(childWith("ROLE: reviewer"), { defaultRole: "executor" }), "reviewer");
   assert.equal(readChildRole(undefined), "executor");
   assert.equal(readChildRole(childWith("ROLE: unknown"), { defaultRole: "reviewer" }), "reviewer");
 });
@@ -128,22 +129,22 @@ test("role marker is found after a runtime-context user message", () => {
         },
         {
           role: "user",
-          content: [{ type: "text", text: "ROLE: scout\nFind the entry point." }]
+          content: [{ type: "text", text: "ROLE: reviewer\nReview the entry point." }]
         }
       ]
     }
   };
-  assert.equal(readChildRole(agent), "scout");
+  assert.equal(readChildRole(agent), "reviewer");
 });
 
 test("custom role marker is honored", () => {
   assert.equal(
-    readChildRole(childWith("PERSONA: scout\nFind it."), { roleMarker: "PERSONA" }),
-    "scout"
+    readChildRole(childWith("PERSONA: reviewer\nReview it."), { roleMarker: "PERSONA" }),
+    "reviewer"
   );
   assert.equal(
-    readChildRole(childWith("PERSONA: scout\nFind it."), { roleMarker: "PERSONA:" }),
-    "scout"
+    readChildRole(childWith("PERSONA: reviewer\nReview it."), { roleMarker: "PERSONA:" }),
+    "reviewer"
   );
   const assets = loadPromptAssets();
   const prompt = renderMainPrompt(assets, {
@@ -157,7 +158,7 @@ test("custom role marker is honored", () => {
 });
 
 test("role list is stable", () => {
-  assert.deepEqual(CHILD_ROLES, ["executor", "reviewer", "scout"]);
+  assert.deepEqual(CHILD_ROLES, ["executor", "reviewer"]);
 });
 
 test("bundled prompts keep their required rule contracts", () => {
@@ -186,15 +187,18 @@ test("bundled prompts keep their required rule contracts", () => {
     },
     {
       name: "executor",
-      rules: [/不派发子 Agent/, /files_changed/, /两轮/]
+      rules: [
+        /不派发子 Agent/,
+        /files_changed/,
+        /两轮/,
+        /Explore-type packages/,
+        /path:line/,
+        /≤6 个工具调用/
+      ]
     },
     {
       name: "reviewer",
       rules: [/finding/, /fresh reviewer/, /blocker/]
-    },
-    {
-      name: "scout",
-      rules: [/事实/, /path:line/]
     }
   ];
   for (const { name, rules } of contracts) {

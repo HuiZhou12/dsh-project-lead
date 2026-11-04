@@ -22,7 +22,7 @@ project_status_update({
   done: 3,
   total: 7,
   workPackages: [
-    { id: "wp-1", title: "探查任务", role: "scout", owner: "<child id>", state: "done", evidence: "简短证据" }
+    { id: "wp-1", title: "探查任务", role: "executor", owner: "<child id>", state: "done", evidence: "简短证据" }
   ],
   activeAgents: 2,
   verification: "未运行 | 通过 | 失败：<摘要>",
@@ -111,7 +111,7 @@ Autonomous / Overnight 还必须维护 [templates/run-manifest.yaml](../template
 
 不要问：
 
-- 代码在哪、用哪个文件、怎么跑测试（派 Scout）；
+- 代码在哪、用哪个文件、怎么跑测试（派探索型 executor 工作包）；
 - 普通实现细节；
 - 文件命名、目录排列等低影响选择。
 

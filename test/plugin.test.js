@@ -272,7 +272,7 @@ test("compact PM prompt includes the configured project profile and role convent
   assert.match(text, /npm test/);
   assert.match(text, /billing/);
   assert.match(text, /ROLE: executor/);
-  assert.match(text, /目录、未知文件清单/);
+  assert.match(text, /未知路径的定位/);
   assert.match(text, /project_status_update/);
   assert.match(text, /不要在聊天里输出/);
   assert.match(text, /当前 turn/);
@@ -448,9 +448,12 @@ test("children get their own role prompt, not the PM prompt", () => {
   assert.match(reviewer, /# Reviewer/);
   assert.match(reviewer, /finding/);
 
-  const scout = sectionText(ctx, SCOUT_CHILD);
-  assert.match(scout, /# Scout/);
-  assert.match(scout, /事实/);
+  const legacyScout = sectionText(ctx, SCOUT_CHILD);
+  // The removed scout role degrades to the executor contract, so old briefs
+  // written with `ROLE: scout` keep working after the upgrade.
+  assert.match(legacyScout, /# Executor/);
+  assert.doesNotMatch(legacyScout, /# Scout/);
+  assert.match(legacyScout, /Explore-type packages/);
 });
 
 test("childRoles false disables child prompts; no subagent tool disables the main prompt", () => {

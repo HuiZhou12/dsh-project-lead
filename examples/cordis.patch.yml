@@ -89,7 +89,7 @@
 # Prefer **Settings → 项目编排** for these values; this YAML is the equivalent
 # file form for automation or profiles without the Settings UI.
 # Project facts live in AGENTS.md, README, and project skills; the PM reads them
-# or dispatches a Scout. The UI no longer exposes a project profile.
+# or dispatches an explore-type work package. The UI no longer exposes a project profile.
 - id: project-lead
   config:
     prompts:

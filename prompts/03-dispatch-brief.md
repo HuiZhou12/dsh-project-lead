@@ -13,7 +13,7 @@ ROLE: {{ROLE}}
 
 ## Role
 
-你是 {{ROLE}}（scout / executor / reviewer）。你的职责是 {{ONE_LINE_RESPONSIBILITY}}。
+你是 {{ROLE}}（executor / reviewer）。你的职责是 {{ONE_LINE_RESPONSIBILITY}}。
 
 ## Objective
 
@@ -176,20 +176,22 @@ send_message({
 5. **明确停止**：缺输入、越界、凭据、失败、范围扩大、预算耗尽都要停。
 6. **控制返回量**：给报告设行数/字数上限；要求摘要优先。
 7. **不重复 owner**：同一路径只派一个 writer。
-8. **不替子 Agent 做设计**：给约束和验收，不给逐行实现指令；Scout 给问题，Executor 给边界，Reviewer 给 subject 和 finding 标准。
+8. **不替子 Agent 做设计**：给约束和验收，不给逐行实现指令；探索包给问题清单，实现包给边界，Reviewer 给 subject 和 finding 标准。
 9. **不泄露无关信息**：只给执行必需的事实，避免把主上下文全量复制给子 Agent。
 10. **先复用后新开**：先查 idle child；合适的用 `send_message`，没有再 `subagent`；不要每个包都新开。
 
 ## 角色变体
 
-### Scout 简报
+### Executor · 探索型简报（只读调查）
 
-- 只读；列出要回答的问题（3–5 个）。
-- 要求 `事实 / 推断 / 未知` 三分，事实带 `path:line`。
+- 第一行仍是 `ROLE: executor`；在简报里注明“探索型工作包，只读，不修改文件”。
+- 列出要回答的问题（3–5 个），一次简报只回答明确问出的问题；无关联的第二个问题另开简报。
+- 简报 ≤800 字符：一行显式问题 + 定位所需的最小上下文；项目背景只用于定位，不是要执行或核验的任务。
+- 要求 `事实 / 推断 / 未知` 三分，事实带 `path:line`；拿到答案即停，不做验证轮。
 - 不要求实现建议，除非明确询问。
 - 输出上限：每个问题不超过 10 行证据。
 
-### Executor 简报
+### Executor · 实现型简报
 
 - 明确允许修改的路径和禁止事项。
 - 明确验证命令和报告格式。
@@ -234,6 +236,5 @@ send_message({
 
 - [06-executor.md](06-executor.md)
 - [07-reviewer.md](07-reviewer.md)
-- [08-scout.md](08-scout.md)
 - [../templates/run-manifest.yaml](../templates/run-manifest.yaml)
 - [../rules/completion.md](../rules/completion.md)

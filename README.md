@@ -5,8 +5,13 @@
 `dsh-project-lead` is a DeepSeek Harness 0.2.x plugin that gives a top-level
 agent a project-management workflow. The Project Lead plans and decomposes a
 task, dispatches self-contained work packages, accepts evidence from child
-agents, and reports the result. Children receive one of three focused role
-contracts: `executor`, `reviewer`, or `scout`.
+agents, and reports the result. Children receive one of two focused role
+contracts: `executor` (implement or explore) and `reviewer`.
+
+Exploration follows the superagent alignment: there is no separate scout role —
+whoever needs the answer searches for it. Unknown-path lookups become
+explore-type executor packages (read-only, deliverable is the investigation
+report), and legacy `ROLE: scout` briefs degrade to the executor contract.
 
 The plugin also provides a Web Settings page, an optional read-only Project
 Manager preset, a collapsible project status card, and process-wide token
@@ -19,9 +24,9 @@ accounting grouped by `provider/model`.
 - **Scoped orchestration prompts.** `compact` and `full` Project Manager
   prompts apply only to the configured PM preset. Other top-level sessions can
   keep their normal tools and receive lightweight guidance or no guidance.
-- **Role-specific children.** A `ROLE: executor`, `ROLE: reviewer`, or
-  `ROLE: scout` marker selects the child contract. Children do not receive the
-  PM contract and are instructed not to delegate again.
+- **Role-specific children.** A `ROLE: executor` or `ROLE: reviewer` marker
+  selects the child contract. Children do not receive the PM contract and are
+  instructed not to delegate again.
 - **A clear tool boundary.** The optional PM preset keeps `read` and
   `read_image`, removes `write`, `edit`, and shell tools, and sends children to
   a code-capable preset such as `standard`.
@@ -86,7 +91,6 @@ changes when hot reload is not enabled.
    ```text
    ROLE: executor
    ROLE: reviewer
-   ROLE: scout
    ```
 
    Without a marker, `prompts.defaultChildRole` (`executor` by default) is
@@ -148,10 +152,10 @@ child prompts.
 | `prompts.main` | `compact` | `compact`, `full`, legacy `guidance`, or `off`. `compact` and `full` use the PM contract only in `pmPreset`. |
 | `prompts.pmPreset` | `pm` | Preset receiving the PM contract; empty applies it to every top-level session. |
 | `prompts.otherMain` | `guidance` | Guidance or `off` for other top-level presets. |
-| `prompts.childRoles` | `true` | Inject the executor/reviewer/scout contract into children. |
+| `prompts.childRoles` | `true` | Inject the executor/reviewer contract into children. |
 | `prompts.defaultChildRole` | `executor` | Role used when a brief has no valid marker. |
-| `prompts.roleMarker` | `ROLE` | Prefix parsed from a line such as `ROLE: scout`. |
-| `prompts.dir` | bundled | Custom directory using `00-project-manager.md` through `08-scout.md`; missing files fall back to bundled prompts. |
+| `prompts.roleMarker` | `ROLE` | Prefix parsed from a line such as `ROLE: executor`. |
+| `prompts.dir` | bundled | Custom directory using `00-project-manager.md` through `07-reviewer.md`; missing files fall back to bundled prompts. |
 | `project.*` | empty | Optional project facts. An empty `project.root` uses the session working directory. |
 | `project.deliveryRequirements` | `[]` | Per-project delivery gates rendered into the PM and child prompts, e.g. a diff-size cap or a review requirement. |
 | `subagent.provider/model` | empty | Default route passed by the PM. Empty values leave route selection to the authorized session. |
@@ -241,15 +245,15 @@ selection, do not pass `provider`, `model`, or `reasoning_effort`.
 ### Built-in child roles
 
 - **Executor:** implements, debugs, and verifies one bounded work package; it
-  does not redefine the goal or spawn another child.
+  does not redefine the goal or spawn another child. Explore-type executor
+  packages are read-only investigations whose deliverable is the findings
+  report (facts with `path:line`, ≤6 tool calls for simple lookups, answer and
+  stop); they replaced the former scout role.
 - **Reviewer:** performs an independent, read-only review and returns findings
   and a verdict; it does not fix the delivery.
-- **Scout:** performs read-only reconnaissance of entry points, dependencies,
-  conventions, and tests; it reports facts without implementing or making
-  product decisions.
 
 The bundled role files are `prompts/00-project-manager.md` through
-`prompts/08-scout.md`.
+`prompts/07-reviewer.md`.
 
 ## Runtime behavior
 

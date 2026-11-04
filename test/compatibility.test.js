@@ -130,7 +130,7 @@ test("manifest remains a mount-only bundle with optional peers", () => {
 });
 
 test("no 0.1.x compatibility branch is advertised", () => {
-  assert.equal(manifest.version, "0.7.2");
+  assert.equal(manifest.version, "0.8.0");
   assert.doesNotMatch(
     JSON.stringify(manifest.peerDependencies),
     /0\.1\./
@@ -147,8 +147,7 @@ test("bundled role prompts are published with the package", () => {
     "04-review-and-accept.md",
     "05-status-budget-handoff.md",
     "06-executor.md",
-    "07-reviewer.md",
-    "08-scout.md"
+    "07-reviewer.md"
   ]) {
     assert.ok(
       existsSync(new URL(`../prompts/${file}`, import.meta.url)),
